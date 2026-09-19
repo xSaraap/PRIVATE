@@ -1,5 +1,5 @@
--- VBHUB UI v3.3
-print("[VBHUB] v3.3 loaded")
+-- VBHUB UI v3.5
+print("[VBHUB] v3.5 loaded")
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -115,24 +115,18 @@ function VBHUB:Load(title, subtitle)
         Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = main,
     })
 
-    local closeBtn = new("TextButton", {
-        Size = UDim2.new(0, 26, 0, 26), Position = UDim2.new(1, -34, 0, 8),
+    -- Hide/Show toggle button labeled "Delete"
+    local deleteBtn = new("TextButton", {
+        Size = UDim2.new(0, 70, 0, 26), Position = UDim2.new(1, -106, 0, 8),
         BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Text = "×", TextColor3 = T.Text, Font = T.Bold, TextSize = 18,
+        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         AutoButtonColor = false, Parent = main, ZIndex = 5,
     })
-    corner(closeBtn, 6)
-    closeBtn.MouseEnter:Connect(function() tw(closeBtn, 0.1, { BackgroundColor3 = T.Danger }) end)
-    closeBtn.MouseLeave:Connect(function() tw(closeBtn, 0.1, { BackgroundColor3 = T.PanelHi }) end)
-    closeBtn.MouseButton1Click:Connect(function() sg.Enabled = false end)
-
-    local visible = true
-    UserInputService.InputBegan:Connect(function(inp, gpe)
-        if gpe then return end
-        if inp.KeyCode == Enum.KeyCode.RightControl then
-            visible = not visible
-            sg.Enabled = visible
-        end
+    corner(deleteBtn, 6)
+    deleteBtn.MouseEnter:Connect(function() tw(deleteBtn, 0.1, { BackgroundColor3 = T.Danger }) end)
+    deleteBtn.MouseLeave:Connect(function() tw(deleteBtn, 0.1, { BackgroundColor3 = T.PanelHi }) end)
+    deleteBtn.MouseButton1Click:Connect(function()
+        main.Visible = not main.Visible
     end)
 
     local drag, ds, sp
@@ -190,7 +184,6 @@ function VBHUB:newTab(name)
     })
     corner(ind, 2)
 
-    -- ScrollingFrame page with a manual canvas size updater
     local page = new("ScrollingFrame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
@@ -216,7 +209,6 @@ function VBHUB:newTab(name)
         Parent = page,
     })
 
-    -- Force canvas update whenever layout changes (belt + suspenders)
     local function refreshCanvas()
         page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 24)
     end
@@ -238,29 +230,19 @@ function VBHUB:newTab(name)
 
     local lib = self
     tab.newInput = function(_, l, p, cb)
-        local r = lib:_input(page, l, p, cb)
-        refreshCanvas()
-        return r
+        local r = lib:_input(page, l, p, cb); refreshCanvas(); return r
     end
     tab.newToggle = function(_, l, d, def, cb)
-        local r = lib:_toggle(page, l, d, def, cb)
-        refreshCanvas()
-        return r
+        local r = lib:_toggle(page, l, d, def, cb); refreshCanvas(); return r
     end
     tab.newButton = function(_, l, d, cb)
-        local r = lib:_button(page, l, d, cb)
-        refreshCanvas()
-        return r
+        local r = lib:_button(page, l, d, cb); refreshCanvas(); return r
     end
     tab.newSlider = function(_, l, d, def, pc, cb)
-        local r = lib:_slider(page, l, d, def, pc, cb)
-        refreshCanvas()
-        return r
+        local r = lib:_slider(page, l, d, def, pc, cb); refreshCanvas(); return r
     end
     tab.newDropdown = function(_, l, d, o, cb)
-        local r = lib:_dropdown(page, l, d, o, cb)
-        refreshCanvas()
-        return r
+        local r = lib:_dropdown(page, l, d, o, cb); refreshCanvas(); return r
     end
 
     return tab
