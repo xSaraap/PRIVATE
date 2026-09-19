@@ -1,18 +1,10 @@
--- Hokalaza UI Library v1.0
--- Standalone replacement for DrRay. Same API surface.
--- Usage:
---   local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/YOURUSER/YOURREPO/main/HokalazaUI.lua"))()
---   ui:Load("Title", "Subtitle")
---   local tab = ui.newTab("main", "")
---   tab.newInput(...), tab.newToggle(...), tab.newButton(...), tab.newSlider(...), tab.newDropdown(...)
-
+-- VBHUB UI Library v1.1 (fixed)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
--- Try to use CoreGui if possible, fall back to PlayerGui
 local function getGuiParent()
     local ok, res = pcall(function()
         if gethui then return gethui() end
@@ -25,28 +17,23 @@ end
 local Library = {}
 Library.__index = Library
 
--- ============ THEME ============
 local Theme = {
-    Background     = Color3.fromRGB(18, 18, 22),
-    Panel          = Color3.fromRGB(24, 24, 30),
-    PanelLight     = Color3.fromRGB(32, 32, 40),
-    Border         = Color3.fromRGB(45, 45, 55),
-    Accent         = Color3.fromRGB(140, 90, 255),
-    AccentHover    = Color3.fromRGB(160, 110, 255),
-    Text           = Color3.fromRGB(240, 240, 245),
-    TextDim        = Color3.fromRGB(150, 150, 165),
-    ToggleOff      = Color3.fromRGB(60, 60, 70),
-    ToggleOn       = Color3.fromRGB(140, 90, 255),
-    Input          = Color3.fromRGB(30, 30, 38),
-    InputFocus     = Color3.fromRGB(40, 40, 52),
-    Button         = Color3.fromRGB(45, 45, 58),
-    ButtonHover    = Color3.fromRGB(60, 60, 78),
-    Danger         = Color3.fromRGB(220, 70, 70),
-    Font           = Enum.Font.Gotham,
-    FontBold       = Enum.Font.GothamBold,
+    Background  = Color3.fromRGB(18, 18, 22),
+    Panel       = Color3.fromRGB(24, 24, 30),
+    PanelLight  = Color3.fromRGB(32, 32, 40),
+    Border      = Color3.fromRGB(45, 45, 55),
+    Accent      = Color3.fromRGB(140, 90, 255),
+    Text        = Color3.fromRGB(240, 240, 245),
+    TextDim     = Color3.fromRGB(150, 150, 165),
+    ToggleOff   = Color3.fromRGB(60, 60, 70),
+    ToggleOn    = Color3.fromRGB(140, 90, 255),
+    Input       = Color3.fromRGB(30, 30, 38),
+    InputFocus  = Color3.fromRGB(40, 40, 52),
+    Danger      = Color3.fromRGB(220, 70, 70),
+    Font        = Enum.Font.Gotham,
+    FontBold    = Enum.Font.GothamBold,
 }
 
--- ============ HELPERS ============
 local function new(class, props)
     local inst = Instance.new(class)
     for k, v in pairs(props or {}) do
@@ -68,30 +55,21 @@ local function stroke(parent, color, thickness)
     })
 end
 
-local function padding(parent, all)
-    return new("UIPadding", {
-        PaddingTop = UDim.new(0, all),
-        PaddingBottom = UDim.new(0, all),
-        PaddingLeft = UDim.new(0, all),
-        PaddingRight = UDim.new(0, all),
-        Parent = parent,
-    })
-end
-
 local function tween(inst, time, props)
-    local t = TweenService:Create(inst, TweenInfo.new(time or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    local t = TweenService:Create(inst,
+        TweenInfo.new(time or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
     t:Play()
     return t
 end
 
--- ============ MAIN WINDOW ============
+-- ============ LOAD ============
 function Library:Load(title, subtitle)
-    if self.Window then return self end
+    if self.Main then return self end
 
     local parent = getGuiParent()
 
     local screenGui = new("ScreenGui", {
-        Name = "HokalazaUI",
+        Name = "VBHUB",
         ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         IgnoreGuiInset = true,
@@ -99,7 +77,6 @@ function Library:Load(title, subtitle)
     })
     self.ScreenGui = screenGui
 
-    -- Main frame
     local main = new("Frame", {
         Name = "Main",
         Size = UDim2.new(0, 560, 0, 420),
@@ -108,13 +85,12 @@ function Library:Load(title, subtitle)
         BorderSizePixel = 0,
         Parent = screenGui,
         Active = true,
-        Draggable = false,
     })
     corner(main, 10)
     stroke(main, Theme.Border, 1)
     self.Main = main
 
-    -- Sidebar (left, tabs)
+    -- Sidebar
     local sidebar = new("Frame", {
         Name = "Sidebar",
         Size = UDim2.new(0, 150, 1, 0),
@@ -124,35 +100,20 @@ function Library:Load(title, subtitle)
     })
     corner(sidebar, 10)
 
-    -- Mask right side of sidebar so its rounded corner doesn't show
-    local sidebarFix = new("Frame", {
-        Size = UDim2.new(0, 20, 1, 0),
-        Position = UDim2.new(1, -20, 0, 0),
-        BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        Parent = sidebar,
-    })
-
-    -- Header inside sidebar
-    local header = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 70),
-        BackgroundTransparency = 1,
-        Parent = sidebar,
-    })
-
-    local titleLbl = new("TextLabel", {
+    -- Header
+    new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 22),
         Position = UDim2.new(0, 14, 0, 16),
         BackgroundTransparency = 1,
-        Text = title or "Hokalaza",
+        Text = title or "VBHUB",
         TextColor3 = Theme.Text,
         Font = Theme.FontBold,
         TextSize = 17,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = header,
+        Parent = sidebar,
     })
 
-    local subLbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 16),
         Position = UDim2.new(0, 14, 0, 38),
         BackgroundTransparency = 1,
@@ -161,14 +122,23 @@ function Library:Load(title, subtitle)
         Font = Theme.Font,
         TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = header,
+        Parent = sidebar,
+    })
+
+    -- Divider under header
+    local divider = new("Frame", {
+        Size = UDim2.new(1, -16, 0, 1),
+        Position = UDim2.new(0, 8, 0, 62),
+        BackgroundColor3 = Theme.Border,
+        BorderSizePixel = 0,
+        Parent = sidebar,
     })
 
     -- Tab container
     local tabHolder = new("ScrollingFrame", {
         Name = "Tabs",
-        Size = UDim2.new(1, 0, 1, -80),
-        Position = UDim2.new(0, 0, 0, 75),
+        Size = UDim2.new(1, -16, 1, -78),
+        Position = UDim2.new(0, 8, 0, 70),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 3,
@@ -178,16 +148,9 @@ function Library:Load(title, subtitle)
         Parent = sidebar,
     })
 
-    local tabLayout = new("UIListLayout", {
+    new("UIListLayout", {
         Padding = UDim.new(0, 4),
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = tabHolder,
-    })
-
-    local tabPadding = new("UIPadding", {
-        PaddingLeft = UDim.new(0, 8),
-        PaddingRight = UDim.new(0, 8),
-        PaddingTop = UDim.new(0, 4),
         Parent = tabHolder,
     })
 
@@ -200,15 +163,15 @@ function Library:Load(title, subtitle)
         Parent = main,
     })
 
-    self.Tabs = {}
-    self.ActiveTab = nil
     self.TabHolder = tabHolder
     self.Content = content
+    self.ActiveTab = nil
     self.TabCount = 0
 
-    -- Top drag bar (for window movement)
+    -- Drag bar
     local dragBar = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 6),
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 0),
         BackgroundTransparency = 1,
         Parent = main,
     })
@@ -238,7 +201,7 @@ function Library:Load(title, subtitle)
         screenGui.Enabled = false
     end)
 
-    -- Toggle keybind (Right Control toggles UI)
+    -- UI visibility toggle (Right Control)
     local uiVisible = true
     UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
@@ -249,8 +212,7 @@ function Library:Load(title, subtitle)
     end)
 
     -- Dragging
-    local dragging = false
-    local dragStart, startPos
+    local dragging, dragStart, startPos
     dragBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
@@ -281,12 +243,8 @@ end
 
 -- ============ TAB ============
 function Library:newTab(name, icon)
-    local tab = {}
-    tab.__index = tab
-    tab.Library = self
-    tab.Name = name
-    tab.Elements = {}
-    tab.Order = self.TabCount
+    local self2 = self
+    local order = self.TabCount
     self.TabCount = self.TabCount + 1
 
     -- Sidebar button
@@ -296,14 +254,14 @@ function Library:newTab(name, icon)
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
-        LayoutOrder = tab.Order,
+        LayoutOrder = order,
         Parent = self.TabHolder,
     })
     corner(btn, 6)
 
     local btnLbl = new("TextLabel", {
         Size = UDim2.new(1, -20, 1, 0),
-        Position = UDim2.new(0, 12, 0, 0),
+        Position = UDim2.new(0, 16, 0, 0),
         BackgroundTransparency = 1,
         Text = name,
         TextColor3 = Theme.TextDim,
@@ -313,10 +271,9 @@ function Library:newTab(name, icon)
         Parent = btn,
     })
 
-    -- Accent indicator bar
     local indicator = new("Frame", {
         Size = UDim2.new(0, 3, 0, 18),
-        Position = UDim2.new(0, 0, 0.5, -9),
+        Position = UDim2.new(0, 6, 0.5, -9),
         BackgroundColor3 = Theme.Accent,
         BorderSizePixel = 0,
         Visible = false,
@@ -324,7 +281,7 @@ function Library:newTab(name, icon)
     })
     corner(indicator, 2)
 
-    -- Content scrolling frame
+    -- Content page
     local page = new("ScrollingFrame", {
         Name = "Page_" .. name,
         Size = UDim2.new(1, 0, 1, 0),
@@ -338,7 +295,7 @@ function Library:newTab(name, icon)
         Parent = self.Content,
     })
 
-    local layout = new("UIListLayout", {
+    new("UIListLayout", {
         Padding = UDim.new(0, 8),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = page,
@@ -349,13 +306,15 @@ function Library:newTab(name, icon)
         Parent = page,
     })
 
-    tab.Button = btn
-    tab.Label = btnLbl
-    tab.Indicator = indicator
-    tab.Page = page
-    tab.Layout = layout
+    local tab = {
+        Library = self,
+        Name = name,
+        Button = btn,
+        Label = btnLbl,
+        Indicator = indicator,
+        Page = page,
+    }
 
-    -- Click handler
     btn.MouseButton1Click:Connect(function()
         self:SelectTab(tab)
     end)
@@ -370,20 +329,35 @@ function Library:newTab(name, icon)
         end
     end)
 
-    -- Auto-select first tab
     if not self.ActiveTab then
         self:SelectTab(tab)
     end
 
-    return setmetatable(tab, { __index = function(t, k)
-        if k == "newInput" or k == "newToggle" or k == "newButton"
-            or k == "newSlider" or k == "newDropdown" then
-            return function(_, ...)
-                return Library["_" .. k](tab, ...)
-            end
-        end
-        return tab[k]
-    end })
+    -- Return tab with element methods mixed in
+    local tabMethods = {}
+    tabMethods.newInput = function(_, label, placeholder, callback)
+        return self2:_newInput(tab, label, placeholder, callback)
+    end
+    tabMethods.newToggle = function(_, label, description, default, callback)
+        return self2:_newToggle(tab, label, description, default, callback)
+    end
+    tabMethods.newButton = function(_, label, description, callback)
+        return self2:_newButton(tab, label, description, callback)
+    end
+    tabMethods.newSlider = function(_, label, description, default, isPercent, callback)
+        return self2:_newSlider(tab, label, description, default, isPercent, callback)
+    end
+    tabMethods.newDropdown = function(_, label, description, options, callback)
+        return self2:_newDropdown(tab, label, description, options, callback)
+    end
+    tabMethods.newLabel = function(_, text)
+        return self2:_newLabel(tab, text)
+    end
+
+    return setmetatable(tabMethods, {
+        __index = tab,
+        __newindex = function(t, k, v) tab[k] = v end,
+    })
 end
 
 function Library:SelectTab(tab)
@@ -401,8 +375,7 @@ function Library:SelectTab(tab)
     tab.Indicator.Visible = true
 end
 
--- ============ ELEMENT BUILDERS ============
--- Shared card frame
+-- ============ ELEMENTS ============
 local function makeCard(parent, height)
     local card = new("Frame", {
         Size = UDim2.new(1, 0, 0, height),
@@ -415,10 +388,26 @@ local function makeCard(parent, height)
     return card
 end
 
+function Library:_newLabel(tab, text)
+    local card = makeCard(tab.Page, 32)
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = card,
+    })
+    return card
+end
+
 function Library:_newInput(tab, label, placeholder, callback)
     local card = makeCard(tab.Page, 62)
 
-    local lbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1,
@@ -430,7 +419,7 @@ function Library:_newInput(tab, label, placeholder, callback)
         Parent = card,
     })
 
-    local sub = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1,
@@ -481,7 +470,7 @@ function Library:_newToggle(tab, label, description, default, callback)
     local card = makeCard(tab.Page, 58)
     local enabled = default and true or false
 
-    local lbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -80, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1,
@@ -493,7 +482,7 @@ function Library:_newToggle(tab, label, description, default, callback)
         Parent = card,
     })
 
-    local sub = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -80, 0, 28),
         Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1,
@@ -554,7 +543,7 @@ function Library:_newButton(tab, label, description, callback)
         Parent = card,
     })
 
-    local lbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1,
@@ -566,7 +555,7 @@ function Library:_newButton(tab, label, description, callback)
         Parent = card,
     })
 
-    local sub = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 28),
         BackgroundTransparency = 1,
@@ -596,7 +585,7 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
     local min, max = 0, 200
     local value = default or 100
 
-    local lbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -70, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1,
@@ -620,7 +609,7 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         Parent = card,
     })
 
-    local sub = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1,
@@ -699,10 +688,8 @@ end
 function Library:_newDropdown(tab, label, description, options, callback)
     local card = makeCard(tab.Page, 62)
     local listOpen = false
-    local selected = nil
-    local optionButtons = {}
 
-    local lbl = new("TextLabel", {
+    new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1,
@@ -728,7 +715,6 @@ function Library:_newDropdown(tab, label, description, options, callback)
     })
     corner(selBox, 6)
 
-    -- Popup
     local popup = new("Frame", {
         Size = UDim2.new(1, -24, 0, #options * 26 + 8),
         Position = UDim2.new(0, 12, 1, 4),
@@ -741,7 +727,7 @@ function Library:_newDropdown(tab, label, description, options, callback)
     corner(popup, 6)
     stroke(popup, Theme.Border, 1)
 
-    local popupLayout = new("UIListLayout", {
+    new("UIListLayout", {
         Padding = UDim.new(0, 2),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = popup,
@@ -790,7 +776,6 @@ function Library:_newDropdown(tab, label, description, options, callback)
         end)
 
         optBtn.MouseButton1Click:Connect(function()
-            selected = opt
             selBox.Text = tostring(opt)
             selBox.TextColor3 = Theme.Text
             closePopup()
