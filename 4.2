@@ -1,0 +1,1424 @@
+-- Hokalaza 4.2 Lite - Main Features Only
+-- Cleaned version - all core automation working, no telemetry
+
+local v30, v31, v42, v43, drRay, v50, v51, players, runService, userInputService, starterGui2,
+v52, localPlayer, v53, mobileAction, currentCamera, v60, v61, autoAdjustPowerWhileAutoFollow,
+v62, v63, v64, v69, v70, blockHitboxesPredict, v338, v404
+
+do
+  local function f1() return end
+  print = f1
+  warn = f1
+  if not require then
+    local starterGui = game:GetService("StarterGui")
+    starterGui:SetCore("SendNotification", {
+      Title = "⚠️ Limited Executor Detected",
+      Text = "Your executor lacks require() support. Some features may not work fully.",
+      Duration = 10,
+    })
+  end
+  v30 = {
+    onlyBumpWhenAutoFollow = true,
+    autoAimMiddleOnFollow = false,
+    autoAdjustPowerWhileAutoFollow = false,
+    blockHitboxesPredict = false,
+    lockFollowButton = false,
+    lockDiveButton = false,
+    followKeyCode = "",
+    diveKeyCode = "",
+    pcAutoFollowEnabled = false,
+    pcAutoDiveEnabled = false,
+    followButtonX = 100,
+    followButtonY = 100,
+    diveButtonX = 160,
+    diveButtonY = 100,
+    followButtonCreated = false,
+    diveButtonCreated = false,
+  }
+  v31 = {}
+  local function f2()
+    local v36, v37 = pcall(function()
+      if readfile then
+        local cfg = readfile("hokalaza_4_2_config.json")
+        local httpService = game:GetService("HttpService")
+        return httpService:JSONDecode(cfg)
+      end
+    end)
+    if v36 and v37 then
+      for key, value in pairs(v30) do
+        v31[key] = v37[key] ~= nil and v37[key] or value
+      end
+      return true
+    else
+      for key2, value2 in pairs(v30) do
+        v31[key2] = value2
+      end
+      return false
+    end
+  end
+  v42 = f2()
+  v43 = {}
+  local function f3()
+    local v47, v48 = pcall(function()
+      if readfile then
+        local presetsJson = readfile("hokalaza_4_2_presets.json")
+        local httpService2 = game:GetService("HttpService")
+        return httpService2:JSONDecode(presetsJson)
+      end
+    end)
+    v43 = v47 and v48 or {}
+  end
+  f3()
+end
+
+drRay = (loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua")))()
+drRay:Load("Hokalaza 4.2 Lite", "Default")
+v50 = drRay.newTab("main", "ImageIdHere")
+v51 = drRay.newTab("Actions", "ImageIdHere")
+
+players = game:GetService("Players")
+runService = game:GetService("RunService")
+userInputService = game:GetService("UserInputService")
+starterGui2 = game:GetService("StarterGui")
+v52 = game:GetService("Workspace")
+localPlayer = players.LocalPlayer
+local character = localPlayer.Character
+local wait = character
+if not character then
+  wait = localPlayer.CharacterAdded:Wait()
+end
+v53 = wait
+mobileAction = localPlayer:FindFirstChild("MobileAction")
+if not mobileAction then
+  mobileAction = Instance.new("BindableEvent")
+  mobileAction.Name = "MobileAction"
+  mobileAction.Parent = localPlayer
+end
+
+local v55
+local function f4()
+  if v55 then return v55 end
+  local character2 = localPlayer.Character
+  if not character2 then return nil end
+  local v58, v59 = pcall(function() return require(character2.CharacterScript.CharacterActions) end)
+  if v58 and v59 then v55 = v59 end
+  return v58 and v59 or nil
+end
+
+localPlayer.CharacterAdded:Connect(function(character3)
+  v53 = character3
+  v55 = nil
+end)
+
+currentCamera = workspace.CurrentCamera
+_G.BumpDistance = 12
+_G.DiveDistance = 20
+_G.MinBallSpeed = 30
+_G.FastBallHeightCap = 15
+_G.BlockNetDistance = 8
+_G.BlockHeightMin = 8
+_G.BlockTriggerRange = 15
+_G.BlockCooldown = 1.5
+_G.BlockedAngleBands = {}
+_G.AngleBandTolerance = 15
+_G.SpikeDistance = 13
+_G.SpikeCooldown = 0.65
+_G.SpikeCourtHalfWidth = 15
+_G.SpikeTargetDepth = 12
+_G.FollowDistance = 15
+_G.OnlyBumpWhenAutoFollow = v31.onlyBumpWhenAutoFollow
+_G.AutoAimMiddleOnFollow = v31.autoAimMiddleOnFollow
+_G.DesiredWalkSpeed = 16
+v60 = false
+v61 = false
+autoAdjustPowerWhileAutoFollow = v31.autoAdjustPowerWhileAutoFollow
+v62 = false
+
+if v31.followKeyCode and v31.followKeyCode ~= "" then
+  pcall(function() v63 = Enum.KeyCode[v31.followKeyCode] end)
+end
+if v31.diveKeyCode and v31.diveKeyCode ~= "" then
+  pcall(function() v64 = Enum.KeyCode[v31.diveKeyCode] end)
+end
+
+local function f5()
+  local playerGui = localPlayer:FindFirstChild("PlayerGui")
+  if not playerGui then return nil end
+  local hud = playerGui:FindFirstChild("HUD")
+  if not hud then return nil end
+  local bars = hud:FindFirstChild("Bars")
+  if not bars then return nil end
+  local power = bars:FindFirstChild("Power")
+  if not power then return nil end
+  local amount = power:FindFirstChild("Amount")
+  if not amount or not amount:IsA("TextLabel") then return nil end
+  return tonumber(amount.Text:match("^(%d+)"))
+end
+
+v69 = {}
+v70 = {}
+
+local function f6(p1)
+  local x, z = p1.X, p1.Z
+  local v72 = math.sqrt(x * x + z * z)
+  if v72 >= 44.85 then return 5
+  elseif v72 >= 35.52 then return 4
+  elseif v72 >= 28.27 then return 3
+  elseif v72 >= 23 then return 2
+  elseif v72 >= 21.25 then return 2
+  elseif v72 >= 16.47 then return 1
+  else return 1 end
+end
+
+local function f7(p2)
+  if not v53 or not v53.Parent then return end
+  local v78 = f5()
+  if not v78 or not p2 then return end
+  local v79 = f4()
+  if not v79 then return end
+  if v78 < p2 then v79:PowerUp()
+  elseif v78 > p2 then v79:PowerDown() end
+end
+
+local function f8(p3, p4, p5, p6)
+  starterGui2:SetCore("SendNotification", {
+    Title = p3, Text = "Press any key to bind " .. p3, Duration = 5,
+  })
+  local connect
+  connect = userInputService.InputBegan:Connect(function(input, p7)
+    if not p7 and input.UserInputType == Enum.UserInputType.Keyboard then
+      p4(input.KeyCode)
+      if p5 then v31[p5] = input.KeyCode.Name end
+      starterGui2:SetCore("SendNotification", {
+        Title = p3, Text = (p6 or "Bound to ") .. input.KeyCode.Name, Duration = 5,
+      })
+      connect:Disconnect()
+    end
+  end)
+end
+
+local vector = Vector3.new(0, 10, 0)
+local connect2
+local function f9(p8)
+  if connect2 then connect2:Disconnect(); connect2 = nil end
+  if p8 then
+    connect2 = runService.RenderStepped:Connect(function()
+      local humanoidRootPart = v53:FindFirstChild("HumanoidRootPart")
+      if humanoidRootPart then
+        local vector2 = Vector3.new(vector.X, humanoidRootPart.Position.Y, vector.Z)
+        humanoidRootPart.CFrame = CFrame.lookAt(humanoidRootPart.Position, vector2)
+      end
+    end)
+  end
+end
+
+local function f10(p9)
+  if mobileAction and mobileAction:IsA("BindableEvent") then
+    mobileAction:Fire(p9, Enum.UserInputState.Begin)
+  else
+    local v104 = f4()
+    if v104 then
+      if p9 == "Click" then pcall(function() v104:Bump() end)
+      elseif p9 == "Dive" then pcall(function() v104:Dive() end)
+      elseif p9 == "ToggleBlock" then pcall(function() v104:ToggleBlock() end) end
+    end
+  end
+end
+
+local function f11()
+  local humanoidRootPart2 = v53:FindFirstChild("HumanoidRootPart")
+  local humanoid = v53:FindFirstChildOfClass("Humanoid")
+  if not (humanoidRootPart2 and humanoid) then return end
+  local v114 = humanoidRootPart2.Position.Z >= 0 and 1 or -1
+  local huge = math.huge
+  local v115 = nil
+  for key3, value3 in pairs(v69) do
+    if value3 and value3.Parent then
+      local ballPart = key3:FindFirstChild("BallPart")
+      if ballPart then
+        if (ballPart.Position.Z >= 0 and 1 or -1) == v114 then
+          local magnitude = (value3.Position - humanoidRootPart2.Position).Magnitude
+          if magnitude < huge then v115 = value3; huge = magnitude end
+        end
+      else
+        local magnitude2 = (value3.Position - humanoidRootPart2.Position).Magnitude
+        if magnitude2 < huge then v115 = value3; huge = magnitude2 end
+      end
+    end
+  end
+  if v115 and huge <= _G.FollowDistance then
+    humanoid:MoveTo(v115.Position)
+  end
+end
+
+local v117 = 0
+
+local function f12(p10)
+  if p10 == "follow" and _G.pcFollowStatusBtn then
+    _G.pcFollowStatusBtn.Parent:Destroy()
+    _G.pcFollowStatusBtn = nil
+  elseif p10 == "dive" and _G.pcDiveStatusBtn then
+    _G.pcDiveStatusBtn.Parent:Destroy()
+    _G.pcDiveStatusBtn = nil
+  end
+end
+
+runService.RenderStepped:Connect(function()
+  local humanoidRootPart3 = v53:FindFirstChild("HumanoidRootPart")
+  if not humanoidRootPart3 then return end
+  if v62 then
+    local v148 = f4()
+    if v148 then v148.State.WalkSpeed = _G.DesiredWalkSpeed end
+  end
+  local v149 = os.clock()
+  local v150 = f4()
+  local v151 = v149 - v117 < 2.5
+  if not v151 and v60 then
+    f11()
+    if autoAdjustPowerWhileAutoFollow then
+      f7(f6(humanoidRootPart3.Position))
+    end
+  end
+  if not v150 or not v150.State then return end
+  local ready = v150.State.Ready
+  local dived = v150.State.Dived
+  local v152 = humanoidRootPart3.Position.Z >= 0 and 1 or -1
+  for index, value4 in ipairs(v52:GetChildren()) do
+    if value4:IsA("Model") and value4.Name == "Ball" then
+      local ballPart2 = value4:FindFirstChild("BallPart")
+      if ballPart2 then
+        local v154 = (ballPart2.Position.Z >= 0 and 1 or -1) ~= v152
+        local v155 = v70[ballPart2]
+        if v155 then
+          if v155.lastPos2 then
+            local v156 = math.max(0.001, v149 - (v155.lastTime2 or v149))
+            v155.speed = (ballPart2.Position - v155.lastPos2).Magnitude / v156
+            v155.vy = (ballPart2.Position.Y - v155.lastPos2.Y) / v156
+          end
+          v155.lastPos2 = ballPart2.Position
+          v155.lastTime2 = v149
+        else
+          v70[ballPart2] = {
+            lastBump = 0, speed = 0, vy = 0,
+            lastPos2 = ballPart2.Position, lastTime2 = v149,
+          }
+        end
+        local v157 = (v70[ballPart2] and v70[ballPart2].speed or 0) >= (_G.MinBallSpeed or 30)
+        local y = ballPart2.Position.Y
+        if not v154 then
+          local magnitude3 = (ballPart2.Position - humanoidRootPart3.Position).Magnitude
+          if v61 and ready and not dived and not v151 and v157
+            and y < _G.FastBallHeightCap and magnitude3 <= _G.DiveDistance then
+            local v166 = v69[value4]
+            local humanoidRootPart4 = v53:FindFirstChild("HumanoidRootPart")
+            local v167 = false
+            if v166 and humanoidRootPart4 then
+              v167 = ((Vector3.new(v166.Position.X, humanoidRootPart4.Position.Y, v166.Position.Z))
+                - humanoidRootPart4.Position).Magnitude <= _G.DiveDistance
+            end
+            if v167 then
+              local v168 = true
+              local zero = Vector3.zero
+              if humanoidRootPart4 and v166 then
+                zero = Vector3.new(
+                  v166.Position.X - humanoidRootPart4.Position.X, 0,
+                  v166.Position.Z - humanoidRootPart4.Position.Z
+                )
+                if zero.Magnitude > 0.1 then
+                  local dot = humanoidRootPart4.CFrame.LookVector.Unit:Dot(zero.Unit)
+                  local v169 = math.clamp(dot, -1, 1)
+                  local v170 = math.deg(math.acos(v169))
+                  for key4, value5 in pairs(_G.BlockedAngleBands) do
+                    if value5 and (math.abs(v170 - key4)) <= _G.AngleBandTolerance then
+                      v168 = false
+                    end
+                  end
+                end
+              end
+              if v168 then
+                v117 = v149
+                v151 = true
+                if humanoidRootPart4 and zero.Magnitude > 0.1 then
+                  humanoidRootPart4.CFrame = CFrame.new(
+                    humanoidRootPart4.Position, humanoidRootPart4.Position + zero
+                  )
+                end
+                f10("Dive")
+              end
+            end
+          end
+          if not v151 then
+            local bumpDistance = _G.BumpDistance
+            if bumpDistance and _G.BumpDistance > 0 then
+              local v177 = not (_G.OnlyBumpWhenAutoFollow and not v60)
+              if v177 then
+                v177 = ready and not dived and magnitude3 <= _G.BumpDistance
+              end
+              if v177 then
+                if v149 - (v70[ballPart2] and v70[ballPart2].lastBump or 0) >= 1.1 then
+                  if not v70[ballPart2] then
+                    v70[ballPart2] = { lastBump = 0, lastDive = 0 }
+                  end
+                  v70[ballPart2].lastBump = v149
+                  f10("Click")
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end)
+
+local function f13(p11, p12)
+  local pcFollowStatusBtn2 = p11 == "follow" and _G.pcFollowStatusBtn or _G.pcDiveStatusBtn
+  if not pcFollowStatusBtn2 then return end
+  local v187 = p11 == "follow" and "PC Follow: " or "PC Dive: "
+  pcFollowStatusBtn2.Text = v187 .. (p12 and "ON" or "OFF")
+  pcFollowStatusBtn2.TextColor3 = (p12 and Color3.new(0, 1, 0)) or Color3.new(1, 1, 1)
+end
+
+local v190 = false
+local f14
+local function f15()
+  if not v190 then f14() end
+  starterGui2:SetCore("SendNotification", {
+    Title = "PC Status", Text = "Press Right Shift to show the status", Duration = 5,
+  })
+end
+
+f14 = function()
+  v190 = not v190
+  if _G.pcFollowStatusBtn then _G.pcFollowStatusBtn.Visible = not v190 end
+  if _G.pcDiveStatusBtn then _G.pcDiveStatusBtn.Visible = not v190 end
+end
+
+local function f16(p13)
+  if p13 == "follow" then
+    if _G.pcFollowStatusBtn then return end
+    local instance3 = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+    local instance = Instance.new("TextButton", instance3)
+    instance.Size = UDim2.new(0, 140, 0, 40)
+    instance.Position = UDim2.new(0, 100, 0, 200)
+    instance.Text = "PC Follow: OFF"
+    instance.BackgroundTransparency = 1
+    instance.BorderSizePixel = 0
+    instance.TextColor3 = Color3.new(1, 1, 1)
+    instance.Draggable = true
+    instance.Visible = not v190
+    _G.pcFollowStatusBtn = instance
+    local instance2 = Instance.new("TextButton", instance)
+    instance2.Size = UDim2.new(0, 20, 0, 20)
+    instance2.Position = UDim2.new(1, -20, 0, 0)
+    instance2.Text = "X"
+    instance2.TextColor3 = Color3.new(1, 1, 1)
+    instance2.BackgroundTransparency = 1
+    instance2.BorderSizePixel = 0
+    instance2.MouseButton1Click:Connect(f15)
+  elseif p13 == "dive" then
+    if _G.pcDiveStatusBtn then return end
+    local instance4 = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+    local instance5 = Instance.new("TextButton", instance4)
+    instance5.Size = UDim2.new(0, 140, 0, 40)
+    instance5.Position = UDim2.new(0, 260, 0, 200)
+    instance5.Text = "PC Dive: OFF"
+    instance5.BackgroundTransparency = 1
+    instance5.BorderSizePixel = 0
+    instance5.TextColor3 = Color3.new(1, 1, 1)
+    instance5.Draggable = true
+    instance5.Visible = not v190
+    _G.pcDiveStatusBtn = instance5
+    local instance6 = Instance.new("TextButton", instance5)
+    instance6.Size = UDim2.new(0, 20, 0, 20)
+    instance6.Position = UDim2.new(1, -20, 0, 0)
+    instance6.Text = "X"
+    instance6.TextColor3 = Color3.new(1, 1, 1)
+    instance6.BackgroundTransparency = 1
+    instance6.BorderSizePixel = 0
+    instance6.MouseButton1Click:Connect(f15)
+  end
+end
+
+userInputService.InputBegan:Connect(function(input2, p14)
+  if p14 then return end
+  if input2.KeyCode == Enum.KeyCode.RightShift then
+    f14()
+  elseif input2.KeyCode == v63 then
+    if next(v69) == nil then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Follow", Text = "You need Predict Ball first", Duration = 4,
+      })
+      return
+    end
+    v60 = not v60
+    f9(v60 and _G.AutoAimMiddleOnFollow)
+    f13("follow", v60)
+  elseif input2.KeyCode == v64 then
+    if next(v69) == nil then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Dive", Text = "You need Predict Ball first", Duration = 4,
+      })
+      return
+    end
+    v61 = not v61
+    f13("dive", v61)
+  end
+end)
+
+v50.newInput("jump height", "10 default", function(p15)
+  local humanoid2 = v53:FindFirstChildOfClass("Humanoid")
+  if humanoid2 then
+    humanoid2.UseJumpPower = false
+    humanoid2.JumpHeight = (tonumber(p15)) or 10
+  end
+end)
+
+v50.newInput("auto dive distance", "20 default (0 disables)", function(p16)
+  _G.DiveDistance = (tonumber(p16)) or 0
+end)
+
+local v212 = false
+local v213 = false
+
+local function f18()
+  if not v212 or v213 then return end
+  local character4 = localPlayer.Character
+  if not character4 then return end
+  local humanoidRootPart5 = character4:FindFirstChild("HumanoidRootPart")
+  local humanoid3 = character4:FindFirstChildOfClass("Humanoid")
+  if not humanoidRootPart5 or not humanoid3 then return end
+  v213 = true
+  humanoid3.AutoRotate = false
+  local lookVector = currentCamera.CFrame.LookVector
+  local vector3 = Vector3.new(lookVector.X, 0, lookVector.Z)
+  if vector3.Magnitude > 0.1 then
+    local unit = vector3.Unit
+    humanoidRootPart5.CFrame = CFrame.lookAt(
+      humanoidRootPart5.Position, humanoidRootPart5.Position + unit
+    )
+  end
+end
+
+local function f20(p19)
+  v213 = false
+  local humanoid5 = p19:WaitForChild("Humanoid")
+  humanoid5.StateChanged:Connect(function(p20, p21)
+    if p21 == Enum.HumanoidStateType.Landed or p21 == Enum.HumanoidStateType.Running then
+      v213 = false
+      if v212 then humanoid5.AutoRotate = true end
+    end
+  end)
+end
+
+if localPlayer.Character then f20(localPlayer.Character) end
+localPlayer.CharacterAdded:Connect(f20)
+
+v51.newInput("auto spike distance", "13 default", function(p22)
+  _G.SpikeDistance = (tonumber(p22)) or 13
+end)
+
+v51.newToggle("Auto Shiftlock on Jump", "snaps to face your camera direction once when you jump", false, function(p23)
+  v212 = p23
+  if not p23 then
+    local character6 = localPlayer.Character
+    local humanoid6 = character6 and character6:FindFirstChildOfClass("Humanoid")
+    if humanoid6 then humanoid6.AutoRotate = true end
+  end
+end)
+
+local v252 = drRay.newTab("Angles", "ImageIdHere")
+
+v252.newToggle("Block auto diving from ~45° turns", "a small turn, still mostly facing forward", false, function(p24)
+  _G.BlockedAngleBands[45] = p24
+end)
+
+local function f21(p25, p26)
+  local v253 = p26
+  local v254 = p25
+  local vector7 = Vector3.new(0, -workspace.Gravity, 0)
+  for i = 1, 120 do
+    v253 = v253 + vector7 * 0.03
+    v254 = v254 + v253 * 0.03
+    if v254.Y <= 0 then return Vector3.new(v254.X, 0, v254.Z) end
+  end
+  return v254
+end
+
+v252.newToggle("Block auto diving from ~60° turns", "a bigger turn, leaning toward the side", false, function(p27)
+  _G.BlockedAngleBands[60] = p27
+end)
+
+v252.newToggle("Block auto diving from ~90° turns", "a full side turn", false, function(p28)
+  _G.BlockedAngleBands[90] = p28
+end)
+
+v252.newToggle("Block auto diving from ~120° turns", "a big turn, leaning toward behind you", false, function(p29)
+  _G.BlockedAngleBands[120] = p29
+end)
+
+v252.newToggle("Block auto diving from ~180° turns", "diving straight backward", false, function(p30)
+  _G.BlockedAngleBands[180] = p30
+end)
+
+v50.newInput("min ball speed (studs/s)", "30 default", function(p31)
+  _G.MinBallSpeed = (tonumber(p31)) or 30
+end)
+
+v50.newInput("auto follow distance", "15 default", function(p32)
+  _G.FollowDistance = (tonumber(p32)) or 15
+end)
+
+v50.newInput("auto bump distance", "12 default (0 disables)", function(p33)
+  _G.BumpDistance = (tonumber(p33)) or 12
+end)
+
+v50.newToggle("only bump when auto follow", "bump only while following", v31.onlyBumpWhenAutoFollow, function(p34)
+  _G.OnlyBumpWhenAutoFollow = p34
+  v31.onlyBumpWhenAutoFollow = p34
+end)
+
+v50.newToggle("auto aim middle when turning on auto follow", "lock cam when following", v31.autoAimMiddleOnFollow, function(p35)
+  _G.AutoAimMiddleOnFollow = p35
+  v31.autoAimMiddleOnFollow = p35
+end)
+
+v50.newToggle("auto adjust power while auto follow", "automatically adjust power", v31.autoAdjustPowerWhileAutoFollow, function(p36)
+  autoAdjustPowerWhileAutoFollow = p36
+  v31.autoAdjustPowerWhileAutoFollow = p36
+end)
+
+v50.newButton("inf stamina", "", function()
+  local v258 = require(game.Players.LocalPlayer.Character.CharacterScript.CharacterActions)
+  local sprint = v258.Sprint
+  function v258.Sprint(p37, ...)
+    p37.State.Stamina = math.huge
+    p37.State.CanSprint = true
+    if sprint then return sprint(p37, ...) end
+  end
+end)
+
+local bindToRenderStep, connect3, connect4
+local function f22()
+  if bindToRenderStep then
+    if connect3 then connect3:Disconnect() end
+    if connect4 then connect4:Disconnect() end
+    runService:UnbindFromRenderStep("VizLanding")
+    bindToRenderStep = nil
+  end
+  while true do
+    task.wait()
+    if v52:FindFirstChild("Ball") then break end
+  end
+  v69 = {}
+  local function f23(p38, p39)
+    local v268 = p38
+    local v269 = p39
+    local vector8 = Vector3.new(0, -workspace.Gravity, 0)
+    local count = 0
+    while count < 120 do
+      count = count + 1
+      v269 = v269 + vector8 * 0.03
+      v268 = v268 + v269 * 0.03
+      if v268.Y <= 0 then return Vector3.new(v268.X, 0, v268.Z) end
+    end
+    return v268
+  end
+  local v270, v271, v272 = {}, {}, {}
+  for index6, value10 in ipairs(v52:GetChildren()) do
+    if value10.Name == "Ball" and not v69[value10] then
+      if value10:WaitForChild("BallPart", 10) then
+        local marker = Instance.new("Part", v52)
+        marker.Name = "Marker"
+        marker.Size = Vector3.new(2, 2, 2)
+        marker.Shape = Enum.PartType.Ball
+        marker.Material = Enum.Material.Neon
+        marker.CanCollide = false
+        marker.Anchored = true
+        marker.Transparency = 0.5
+        v69[value10] = marker
+      end
+    end
+  end
+  connect3 = v52.ChildAdded:Connect(function(child)
+    if child.Name == "Ball" and not v69[child] then
+      if child:WaitForChild("BallPart", 10) then
+        local marker2 = Instance.new("Part", v52)
+        marker2.Name = "Marker"
+        marker2.Size = Vector3.new(2, 2, 2)
+        marker2.Shape = Enum.PartType.Ball
+        marker2.Material = Enum.Material.Neon
+        marker2.CanCollide = false
+        marker2.Anchored = true
+        marker2.Transparency = 0.5
+        v69[child] = marker2
+      end
+    end
+  end)
+  connect4 = v52.ChildRemoved:Connect(function(child2)
+    local v278 = v69[child2]
+    if v278 then v278:Destroy() end
+    v69[child2] = nil
+    v270[child2] = nil
+    v271[child2] = nil
+    v272[child2] = nil
+  end)
+  bindToRenderStep = runService:BindToRenderStep("VizLanding", Enum.RenderPriority.Camera.Value, function(p40)
+    if (cleanupCounter or 0) + 1 > 30 then
+      for key5, value11 in pairs(v271) do
+        if not key5.Parent then
+          v271[key5] = nil
+          v272[key5] = nil
+        end
+      end
+    end
+    for key6, value12 in pairs(v69) do
+      if not value12 or not value12.Parent then
+        v69[key6] = nil
+      else
+        local ballPart5 = key6:FindFirstChild("BallPart")
+        if ballPart5 then
+          local position = ballPart5.Position
+          if v271[key6] then
+            local v291 = (position - v271[key6]) / p40
+            local v292 = v291 - (v272[key6] or Vector3.zero)
+            local v293 = math.clamp(v292.Magnitude / 60, 0.08, 1)
+            v272[key6] = (v272[key6] or Vector3.zero):Lerp(v291, v293)
+          end
+          v271[key6] = position
+          local v296 = f23(position, v272[key6] or Vector3.zero)
+          if v270[key6] then
+            v270[key6] = v270[key6]:Lerp(v296, math.clamp((v296 - v270[key6]).Magnitude / 8, 0.12, 1))
+          else
+            v270[key6] = v296
+          end
+          value12.CFrame = CFrame.new(v270[key6])
+        else
+          v69[key6] = nil
+        end
+      end
+    end
+  end)
+end
+
+v50.newButton("predict ball", "show landing spot markers", f22)
+
+local v297 = true
+
+v50.newToggle("PC Auto-Follow", "enable via keybind", v31.pcAutoFollowEnabled, function(p41)
+  if v297 then return end
+  if p41 then
+    if next(v69) == nil then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Follow", Text = "You need Predict Ball first", Duration = 4,
+      })
+      return
+    end
+  end
+  v60 = false
+  f9(false)
+  v31.pcAutoFollowEnabled = p41
+  if p41 then
+    if not v63 then
+      f8("Auto-Follow", function(p42) v63 = p42 end, "followKeyCode", "auto follow keybind set to ")
+    end
+    f16("follow")
+    f13("follow", false)
+  else
+    v63 = nil
+    f12("follow")
+  end
+end)
+
+local function f24(p43)
+  if p43 == "follow" then
+    if _G.mobileFollowBtn then return end
+    local instance7 = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+    local instance9 = Instance.new("TextButton", instance7)
+    instance9.Size = UDim2.new(0, 50, 0, 50)
+    instance9.Position = UDim2.new(0, v31.followButtonX, 0, v31.followButtonY)
+    instance9.Text = "Follow: OFF"
+    instance9.BackgroundColor3 = Color3.new(0.6, 0, 0)
+    instance9.TextColor3 = Color3.new(1, 1, 1)
+    instance9.Draggable = not v31.lockFollowButton
+    _G.mobileFollowBtn = instance9
+    v31.followButtonCreated = true
+    instance9:GetPropertyChangedSignal("Position"):Connect(function()
+      v31.followButtonX = instance9.Position.X.Offset
+      v31.followButtonY = instance9.Position.Y.Offset
+    end)
+    instance9.MouseButton1Click:Connect(function()
+      v60 = not v60
+      instance9.Text = v60 and "Follow: ON" or "Follow: OFF"
+      instance9.BackgroundColor3 = (v60 and Color3.new(0, 0.6, 0)) or Color3.new(0.6, 0, 0)
+      f9(v60 and _G.AutoAimMiddleOnFollow)
+    end)
+  elseif p43 == "dive" then
+    if _G.mobileDiveBtn then return end
+    local instance10 = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+    local instance8 = Instance.new("TextButton", instance10)
+    instance8.Size = UDim2.new(0, 50, 0, 50)
+    instance8.Position = UDim2.new(0, v31.diveButtonX, 0, v31.diveButtonY)
+    instance8.Text = "Dive: OFF"
+    instance8.BackgroundColor3 = Color3.new(0.6, 0, 0)
+    instance8.TextColor3 = Color3.new(1, 1, 1)
+    instance8.Draggable = not v31.lockDiveButton
+    _G.mobileDiveBtn = instance8
+    v31.diveButtonCreated = true
+    instance8:GetPropertyChangedSignal("Position"):Connect(function()
+      v31.diveButtonX = instance8.Position.X.Offset
+      v31.diveButtonY = instance8.Position.Y.Offset
+    end)
+    instance8.MouseButton1Click:Connect(function()
+      v61 = not v61
+      instance8.Text = v61 and "Dive: ON" or "Dive: OFF"
+      instance8.BackgroundColor3 = (v61 and Color3.new(0, 0.6, 0)) or Color3.new(0.6, 0, 0)
+    end)
+  end
+end
+
+v50.newButton("Mobile Follow Control", "reset follow button position", function()
+  if not _G.mobileFollowBtn then f24("follow")
+  else
+    _G.mobileFollowBtn.Position = UDim2.new(0, 100, 0, 100)
+    v31.followButtonX, v31.followButtonY = 100, 100
+  end
+end)
+
+v50.newToggle("Lock Follow Button", "lock/unlock mobile follow drag", v31.lockFollowButton, function(p45)
+  if _G.mobileFollowBtn then _G.mobileFollowBtn.Draggable = not p45 end
+  v31.lockFollowButton = p45
+end)
+
+v50.newToggle("PC Auto-Dive", "enable via keybind", v31.pcAutoDiveEnabled, function(p46)
+  if v297 then return end
+  if p46 then
+    if next(v69) == nil then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Dive", Text = "You need Predict Ball first", Duration = 4,
+      })
+      return
+    end
+  end
+  v61 = false
+  v31.pcAutoDiveEnabled = p46
+  if p46 then
+    if not v64 then
+      f8("Auto-Dive", function(p47) v64 = p47 end, "diveKeyCode", "auto dive keybind set to ")
+    end
+    f16("dive")
+    f13("dive", false)
+  else
+    v64 = nil
+    f12("dive")
+  end
+end)
+
+task.defer(function() v297 = false end)
+
+v50.newButton("Mobile Dive Control", "reset dive button position", function()
+  if not _G.mobileDiveBtn then f24("dive")
+  else
+    _G.mobileDiveBtn.Position = UDim2.new(0, 160, 0, 100)
+    v31.diveButtonX, v31.diveButtonY = 160, 100
+  end
+end)
+
+v50.newToggle("Lock Dive Button", "lock/unlock mobile dive drag", v31.lockDiveButton, function(p48)
+  if _G.mobileDiveBtn then _G.mobileDiveBtn.Draggable = not p48 end
+  v31.lockDiveButton = p48
+end)
+
+v50.newInput("walk speed", "16 default", function(p49)
+  _G.DesiredWalkSpeed = (tonumber(p49)) or 16
+end)
+
+v50.newToggle("Speed Override", "custom walk speed", false, function(p50)
+  v62 = p50
+  if not p50 then
+    local v334 = f4()
+    if v334 then v334.State.WalkSpeed = 16 end
+  end
+end)
+
+v50.newButton("no lfs", "servings", function()
+  workspace.ServeLF.Size = Vector3.new(0, 1, 1)
+end)
+
+v50.newButton("no lfs backrow", "backrow", function()
+  workspace.Court2.BackrowLF.Size = Vector3.new(0, 1, 1)
+  workspace.Court1.BackrowLF.Size = Vector3.new(0, 1, 1)
+end)
+
+v50.newButton("infinite yield", "", function()
+  loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+end)
+
+blockHitboxesPredict = v31.blockHitboxesPredict
+
+local function f26(p51, p52, p53)
+  local v335 = p51
+  local v336 = p52
+  local vector9 = Vector3.new(0, -workspace.Gravity, 0)
+  local v337 = math.ceil(p53 / 0.03)
+  local count2 = 0
+  while count2 < v337 do
+    count2 = count2 + 1
+    v336 = v336 + vector9 * 0.03
+    v335 = v335 + v336 * 0.03
+    if v335.Y <= 0 then return Vector3.new(v335.X, 0, v335.Z) end
+  end
+  return v335
+end
+
+v338 = 0.3
+local v339, v340, v341, v342, v343, v344, v345, v346 = {}, {}, {}, {}, {}, {}, {}, {}
+
+local function f27(p54)
+  if v339[p54] then v339[p54]:Destroy() end
+  if v340[p54] then v340[p54]:Destroy() end
+  if v343[p54] then v343[p54]:Destroy() end
+  v339[p54] = nil
+  v340[p54] = nil
+  v343[p54] = nil
+  v341[p54] = nil
+  v342[p54] = nil
+  v344[p54] = false
+  v345[p54] = nil
+  v346[p54] = nil
+end
+
+local function f28(p55)
+  if p55 == localPlayer then return end
+  if localPlayer.Team and p55.Team and localPlayer.Team == p55.Team then return end
+  f27(p55)
+  v342[p55] = Vector3.zero
+  v344[p55] = false
+end
+
+local connect5, connect6
+
+local function f29()
+  if connect5 then return end
+  for _, value13 in ipairs(players:GetPlayers()) do f28(value13) end
+  connect5 = players.PlayerAdded:Connect(f28)
+  connect6 = players.PlayerRemoving:Connect(f27)
+  runService:BindToRenderStep("PredictHitbox", Enum.RenderPriority.Camera.Value, function(p56)
+    if not blockHitboxesPredict then return end
+    if (cleanupFrames or 0) + 1 > 60 then
+      for key7, value14 in pairs(v342) do
+        if not key7 or not key7.Parent or not key7.Character then
+          v342[key7] = nil
+          v341[key7] = nil
+          v344[key7] = nil
+          v345[key7] = nil
+          v346[key7] = nil
+        end
+      end
+    end
+    for _, value15 in ipairs(players:GetPlayers()) do
+      if value15 ~= localPlayer then
+        local skip = localPlayer.Team and value15.Team and localPlayer.Team == value15.Team
+        if not skip and v342[value15] then
+          local character7 = value15.Character
+          if character7 then
+            local blockHitbox = character7:FindFirstChild("BlockHitbox")
+            local humanoidRootPart8 = character7:FindFirstChild("HumanoidRootPart")
+            local humanoid7 = character7:FindFirstChildOfClass("Humanoid")
+            if blockHitbox and humanoidRootPart8 and humanoid7 then
+              local position2 = humanoidRootPart8.Position
+              if v341[value15] then
+                v342[value15] = v342[value15]:Lerp((position2 - v341[value15]) / p56, 0.2)
+              end
+              v341[value15] = position2
+              local y2 = v342[value15].Y
+              if humanoid7.FloorMaterial == Enum.Material.Air then
+                if not v340[value15] or not v340[value15].Parent then
+                  local hitboxGhost = Instance.new("Part")
+                  hitboxGhost.Name = "HitboxGhost"
+                  hitboxGhost.Size = blockHitbox.Size
+                  hitboxGhost.Anchored = true
+                  hitboxGhost.CanCollide = false
+                  hitboxGhost.Transparency = 1
+                  hitboxGhost.CastShadow = false
+                  hitboxGhost.Parent = workspace
+                  v340[value15] = hitboxGhost
+                  if v343[value15] then v343[value15]:Destroy(); v343[value15] = nil end
+                end
+                if not v343[value15] or not v343[value15].Parent then
+                  local selectionBox = Instance.new("SelectionBox")
+                  selectionBox.Color3 = Color3.fromRGB(255, 80, 80)
+                  selectionBox.LineThickness = 0.05
+                  selectionBox.SurfaceTransparency = 0.55
+                  selectionBox.SurfaceColor3 = Color3.fromRGB(255, 80, 80)
+                  selectionBox.Adornee = v340[value15]
+                  selectionBox.Parent = workspace
+                  v343[value15] = selectionBox
+                end
+                if not v339[value15] or not v339[value15].Parent then
+                  local jumpMarker = Instance.new("Part")
+                  jumpMarker.Name = "JumpMarker"
+                  jumpMarker.Size = Vector3.new(2, 0.3, 2)
+                  jumpMarker.Anchored = true
+                  jumpMarker.CanCollide = false
+                  jumpMarker.Material = Enum.Material.Neon
+                  jumpMarker.Color = Color3.fromRGB(80, 200, 255)
+                  jumpMarker.Transparency = 0.5
+                  jumpMarker.Parent = workspace
+                  v339[value15] = jumpMarker
+                end
+                v340[value15].Size = blockHitbox.Size
+                if not v344[value15] and y2 <= 0 then
+                  v344[value15] = true
+                  v345[value15] = v340[value15].CFrame
+                  v346[value15] = os.clock()
+                end
+                if v344[value15] then
+                  if os.clock() - (v346[value15] or os.clock()) > 1.5 or y2 > 0.1 then
+                    v344[value15] = false
+                    v345[value15] = nil
+                    v346[value15] = nil
+                  else
+                    v340[value15].CFrame = v345[value15]
+                  end
+                else
+                  local v389 = f26(position2, v342[value15], v338)
+                  v340[value15].CFrame = CFrame.new(v389)
+                end
+                local v390 = f21(position2, v342[value15])
+                v339[value15].CFrame = CFrame.new(v390)
+              else
+                if v343[value15] then v343[value15]:Destroy(); v343[value15] = nil end
+                if v340[value15] then v340[value15]:Destroy(); v340[value15] = nil end
+                if v339[value15] then v339[value15]:Destroy(); v339[value15] = nil end
+                v344[value15] = false
+                v345[value15] = nil
+              end
+            end
+          end
+        end
+      end
+    end
+  end)
+end
+
+local function f30()
+  runService:UnbindFromRenderStep("PredictHitbox")
+  if connect5 then connect5:Disconnect(); connect5 = nil end
+  if connect6 then connect6:Disconnect(); connect6 = nil end
+  for _, value16 in ipairs(players:GetPlayers()) do f27(value16) end
+end
+
+if blockHitboxesPredict then f29() end
+
+v51.newInput("block hitboxes delay (second)", "0.30 default", function(p57)
+  v338 = (tonumber(p57)) or 0.3
+end)
+
+v51.newToggle("block hitboxes predict", "highlight & predict enemy jump landing", v31.blockHitboxesPredict, function(p58)
+  blockHitboxesPredict = p58
+  v31.blockHitboxesPredict = p58
+  if p58 then f29() else f30() end
+end)
+
+local v397 = false
+local v398 = 0.5
+
+runService.RenderStepped:Connect(function()
+  if not v397 then return end
+  local playerGui2 = localPlayer:FindFirstChild("PlayerGui")
+  local hud2 = playerGui2 and playerGui2:FindFirstChild("HUD")
+  local spin = hud2 and hud2:FindFirstChild("Spin")
+  if not spin or not spin.Visible then return end
+  local dot2 = spin:FindFirstChild("Dot")
+  if not dot2 then return end
+  local position3 = dot2.Position
+  dot2.Position = UDim2.new(v398, position3.X.Offset, position3.Y.Scale, position3.Y.Offset)
+end)
+
+v51.newSlider("Serve Spin Target", "0=full backspin, 100=center, 200=full topspin", 200, false, function(p59)
+  v398 = 0.5 - (math.clamp((p59 - 100) / 100, -1, 1)) / 2
+end)
+
+v51.newToggle("Auto Serve Spin (lock in place)", "locks the spin dot at your target position", false, function(p60)
+  v397 = p60
+end)
+
+v404 = drRay.newTab("Pickup", "ImageIdHere")
+
+local v405 = {
+  ["top left"] = 4, ["top middle"] = 3, ["top right"] = 2,
+  ["bottom left"] = 5, ["bottom middle"] = 6, ["bottom right"] = 1,
+}
+local v406 = { 1, 2, 3, 4, 5, 6 }
+local v407
+
+local function f31()
+  for _, value17 in ipairs(v407) do value17:Disconnect() end
+  v407 = {}
+end
+
+local v408 = { ["red team (A)"] = "A", ["blue team (B)"] = "B" }
+local v409
+local function f32()
+  if v409 == "any" then return v406 end
+  local v412 = v405[v409]
+  return v412 and { v412 } or {}
+end
+
+local function f33(p61, p62)
+  local v416, v417 = pcall(function()
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local gameData = replicatedStorage:FindFirstChild("GameData")
+    local match2 = gameData and gameData:FindFirstChild("Match2")
+    local findFirstChild = match2 and match2:FindFirstChild("Players" .. p61)
+    local findFirstChild2 = findFirstChild and findFirstChild:FindFirstChild(tostring(p62))
+    return findFirstChild2 and findFirstChild2.Value
+  end)
+  if v416 then return v417 end
+  return nil
+endlocal v423 = false
+
+local function f34(p63, p64)
+  return pcall(function()
+    game:GetService("ReplicatedStorage").Remotes.Pickups:FireServer(table.unpack({
+      [1] = "JoinTeam",
+      [2] = { Match = "Match2", Position = p64, TeamId = p63 },
+    }))
+  end)
+end
+
+local function f35(p65, p66)
+  local v429 = { pcall(function()
+    local replicatedStorage2 = game:GetService("ReplicatedStorage")
+    local gameData2 = replicatedStorage2:FindFirstChild("GameData")
+    local match22 = gameData2 and gameData2:FindFirstChild("Match2")
+    local findFirstChild3 = match22 and match22:FindFirstChild("Players" .. p65)
+    return findFirstChild3 and findFirstChild3:FindFirstChild(tostring(p66))
+  end) }
+  if v429[1] then return v429[2] end
+  return nil
+end
+
+local function f36(p67)
+  for _, value18 in ipairs(p67) do
+    for _, value19 in ipairs(v406) do
+      if f33(value18, value19) == localPlayer.Name then return true end
+    end
+  end
+  return false
+end
+
+local function f37(p68, p69)
+  local v438 = f33(p68, p69)
+  local v439 = v438 == localPlayer.Name
+  local v440 = v438 == "" or v438 == nil
+  if not v439 and v440 then
+    f34(p68, p69)
+    return true
+  end
+  return false
+end
+
+v407 = {}
+local v444 = false
+local v445
+
+local function f38()
+  if not v423 or not v409 or not v445 then return end
+  if v444 then return end
+  local v452 = v445 == "both" and { "A", "B" } or { v408[v445] }
+  if v409 == "any" and f36(v452) then return end
+  local v456 = false
+  for _, value20 in ipairs(f32()) do
+    for _, value21 in ipairs(v452) do
+      if f37(value21, value20) then v456 = true; break end
+    end
+    if v456 then break end
+  end
+  if v456 then
+    v444 = true
+    task.delay(0.3, function() v444 = false end)
+  end
+end
+
+local function f39()
+  f31()
+  if not v423 or not v409 or not v445 then return end
+  local v465 = v445 == "both" and { "A", "B" } or { v408[v445] }
+  for _, value22 in ipairs(v465) do
+    for _, value23 in ipairs(f32()) do
+      local v467 = f35(value22, value23)
+      if v467 then
+        table.insert(v407, v467:GetPropertyChangedSignal("Value"):Connect(f38))
+      end
+    end
+  end
+  f38()
+end
+
+task.spawn(function()
+  while true do
+    task.wait(5)
+    if v423 then f39() end
+  end
+end)
+
+v404.newButton("Auto Pickup Info", "tap to see current selection", function()
+  starterGui2:SetCore("SendNotification", {
+    Title = "Auto Pickup",
+    Text = "Position: " .. (v409 or "none") .. " | Team: " .. (v445 or "none"),
+    Duration = 4,
+  })
+end)
+
+v404.newDropdown("Position", "choose which court position to auto-pick", {
+  "any", "top left", "top middle", "top right", "bottom left", "bottom middle", "bottom right",
+}, function(p70)
+  v409 = p70
+  if v423 then f39() end
+end)
+
+v404.newDropdown("Team", "choose which team's slot to target", { "red team (A)", "blue team (B)", "both" }, function(p71)
+  v445 = p71
+  if v423 then f39() end
+end)
+
+v404.newToggle("Auto pick slot if available", "fires the pickup remote once the selected slot opens up", false, function(p72)
+  if p72 and (not v409 or not v445) then
+    starterGui2:SetCore("SendNotification", {
+      Title = "Auto Pickup", Text = "Pick both a position and a team first", Duration = 4,
+    })
+    v423 = false
+    return
+  end
+  v423 = p72
+  v444 = false
+  if p72 then f39() else f31() end
+end)
+
+local v478 = drRay.newTab("Preset", "ImageIdHere")
+local v479 = ""
+
+local function f40()
+  if _G.mobileFollowBtn then _G.mobileFollowBtn.Parent:Destroy(); _G.mobileFollowBtn = nil end
+  if _G.mobileDiveBtn then _G.mobileDiveBtn.Parent:Destroy(); _G.mobileDiveBtn = nil end
+  f12("follow")
+  f12("dive")
+  v60 = false
+  v61 = false
+  f9(false)
+  v63 = nil
+  v64 = nil
+  autoAdjustPowerWhileAutoFollow = false
+  blockHitboxesPredict = false
+  f30()
+  for key8 in pairs(v31) do v31[key8] = nil end
+  for key9, value25 in pairs(v30) do v31[key9] = value25 end
+  _G.BumpDistance = 12
+  _G.DiveDistance = 20
+  _G.MinBallSpeed = 30
+  _G.FastBallHeightCap = 15
+  _G.FollowDistance = 15
+  _G.OnlyBumpWhenAutoFollow = v31.onlyBumpWhenAutoFollow
+  _G.AutoAimMiddleOnFollow = v31.autoAimMiddleOnFollow
+  _G.DesiredWalkSpeed = 16
+  v338 = 0.3
+  starterGui2:SetCore("SendNotification", {
+    Title = "Reset Complete",
+    Text = "Everything restored to default. Reload the script to fully refresh the UI.",
+    Duration = 6,
+  })
+end
+
+v478.newButton("Reset To Default", "wipes ALL settings back to factory default", function()
+  f40()
+end)
+
+local function f41(p73)
+  if p73.onlyBumpWhenAutoFollow ~= nil then _G.OnlyBumpWhenAutoFollow = p73.onlyBumpWhenAutoFollow end
+  if p73.autoAimMiddleOnFollow ~= nil then _G.AutoAimMiddleOnFollow = p73.autoAimMiddleOnFollow end
+  if p73.autoAdjustPowerWhileAutoFollow ~= nil then autoAdjustPowerWhileAutoFollow = p73.autoAdjustPowerWhileAutoFollow end
+  if p73.blockHitboxesPredict ~= nil then
+    blockHitboxesPredict = p73.blockHitboxesPredict
+    if blockHitboxesPredict then f29() else f30() end
+  end
+end
+
+local v484 = {
+  "onlyBumpWhenAutoFollow", "autoAimMiddleOnFollow",
+  "autoAdjustPowerWhileAutoFollow", "blockHitboxesPredict",
+}
+
+local function f42(p74)
+  if not p74 or p74 == "" then
+    starterGui2:SetCore("SendNotification", { Title = "Preset", Text = "Type a name in the box first", Duration = 4 })
+    return
+  end
+  local v488 = {}
+  for _, value26 in ipairs(v484) do v488[value26] = v31[value26] end
+  v43[p74] = v488
+  starterGui2:SetCore("SendNotification", {
+    Title = "Preset Saved", Text = "\"" .. p74 .. "\" saved", Duration = 4,
+  })
+end
+
+local function f43(p75)
+  if not p75 or p75 == "" then
+    starterGui2:SetCore("SendNotification", { Title = "Preset", Text = "Type a name in the box first", Duration = 4 })
+    return
+  end
+  local v494 = v43[p75]
+  if not v494 then
+    starterGui2:SetCore("SendNotification", {
+      Title = "Preset", Text = "No preset named \"" .. p75 .. "\"", Duration = 4,
+    })
+    return
+  end
+  for _, value27 in ipairs(v484) do
+    if v494[value27] ~= nil then v31[value27] = v494[value27] end
+  end
+  f41(v494)
+  starterGui2:SetCore("SendNotification", {
+    Title = "Preset Loaded",
+    Text = "\"" .. p75 .. "\" applied. Reload the script to fully refresh the UI.",
+    Duration = 6,
+  })
+end
+
+local function f44(p76)
+  if not p76 or p76 == "" then
+    starterGui2:SetCore("SendNotification", { Title = "Preset", Text = "Type a name in the box first", Duration = 4 })
+    return
+  end
+  if not v43[p76] then
+    starterGui2:SetCore("SendNotification", {
+      Title = "Preset", Text = "No preset named \"" .. p76 .. "\"", Duration = 4,
+    })
+    return
+  end
+  v43[p76] = nil
+  starterGui2:SetCore("SendNotification", {
+    Title = "Preset Deleted", Text = "\"" .. p76 .. "\" removed", Duration = 4,
+  })
+end
+
+local function f45()
+  local v503 = {}
+  for key10 in pairs(v43) do table.insert(v503, key10) end
+  if #v503 == 0 then
+    starterGui2:SetCore("SendNotification", {
+      Title = "Saved Presets", Text = "You have no presets yet", Duration = 4,
+    })
+    return
+  end
+  table.sort(v503)
+  starterGui2:SetCore("SendNotification", {
+    Title = "Saved Presets", Text = table.concat(v503, ", "), Duration = 6,
+  })
+end
+
+v478.newButton("How Presets Work", "tap for a quick step-by-step guide", function()
+  starterGui2:SetCore("SendNotification", {
+    Title = "Step 1 of 3", Text = "Type a name in the box below", Duration = 4,
+  })
+  task.delay(2, function()
+    starterGui2:SetCore("SendNotification", {
+      Title = "Step 2 of 3", Text = "Tap Save Preset to store your current settings", Duration = 4,
+    })
+  end)
+  task.delay(4, function()
+    starterGui2:SetCore("SendNotification", {
+      Title = "Step 3 of 3", Text = "Later, type that name + tap Load Preset to bring it back", Duration = 4,
+    })
+  end)
+end)
+
+v478.newInput("Preset Name", "type a name, then use the buttons below", function(p77)
+  v479 = p77
+end)
+
+v478.newButton("Save Preset", "stores your CURRENT settings under this name", function() f42(v479) end)
+v478.newButton("Load Preset", "applies the preset matching this name", function() f43(v479) end)
+v478.newButton("Delete Preset", "removes the preset matching this name", function() f44(v479) end)
+v478.newButton("List Saved Presets", "shows every preset name you've saved", function() f45() end)
+
+local function f46(p78)
+  if not (p78:IsA("Model") and p78.Name == "Ball") then return end
+  local ballPart6 = p78:FindFirstChild("BallPart")
+  if ballPart6 then v70[ballPart6] = { lastBump = 0, lastDive = 0 } end
+  p78.ChildAdded:Connect(function(child3)
+    if child3.Name == "BallPart" then v70[child3] = { lastBump = 0, lastDive = 0 } end
+  end)
+  p78.ChildRemoved:Connect(function(child4)
+    if child4.Name == "BallPart" then v70[child4] = nil end
+  end)
+end
+
+for _, value29 in ipairs(v52:GetChildren()) do f46(value29) end
+
+v52.ChildAdded:Connect(function(child5)
+  if child5:IsA("Model") and child5.Name == "Ball" then
+    task.spawn(function()
+      local waitForChild = child5:WaitForChild("BallPart", 10)
+      if waitForChild then v70[waitForChild] = { lastBump = 0, lastDive = 0 } end
+    end)
+    f46(child5)
+  end
+end)
+
+v52.ChildRemoved:Connect(function(child6)
+  if not (child6:IsA("Model") and child6.Name == "Ball") then return end
+  for key11 in pairs(v70) do
+    if type(key11) == "userdata" and (not key11.Parent or key11.Parent == child6) then
+      v70[key11] = nil
+    end
+  end
+end)
+
+local v526 = 0
+runService.Heartbeat:Connect(function()
+  local v527 = os.clock()
+  for key12 in pairs(v70) do
+    if type(key12) == "userdata" and not key12.Parent then v70[key12] = nil end
+  end
+  if v527 - v526 >= 10 then
+    v526 = v527
+    for _, value32 in ipairs(v52:GetChildren()) do
+      if value32:IsA("Model") and value32.Name == "Ball" then
+        local ballPart7 = value32:FindFirstChild("BallPart")
+        if ballPart7 and not v70[ballPart7] then
+          v70[ballPart7] = { lastBump = 0, lastDive = 0 }
+        end
+      end
+    end
+  end
+end)
+
+if v42 then
+  task.spawn(function()
+    task.spawn(f22)
+    task.wait(0.5)
+    local total = 0
+    repeat
+      task.wait(0.2)
+      total = total + 0.2
+    until (next(v69)) ~= nil or total >= 10
+    if v63 then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Follow", Text = "auto follow keybind loaded: " .. v63.Name, Duration = 5,
+      })
+      if v31.pcAutoFollowEnabled then f16("follow"); f13("follow", false) end
+    end
+    if v64 then
+      starterGui2:SetCore("SendNotification", {
+        Title = "Auto-Dive", Text = "auto dive keybind loaded: " .. v64.Name, Duration = 5,
+      })
+      if v31.pcAutoDiveEnabled then f16("dive"); f13("dive", false) end
+    end
+    if v31.followButtonCreated then f24("follow") end
+    if v31.diveButtonCreated then f24("dive") end
+  end)
+end
+
+return
