@@ -1,5 +1,4 @@
--- VBHUB UI v3.7
-
+-- VBHUB UI v3.8
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -15,20 +14,22 @@ local function getGuiParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
+-- Softened palette: darker base, muted accent, lower contrast
 local T = {
-    BG = Color3.fromRGB(18, 18, 22),
-    Panel = Color3.fromRGB(24, 24, 30),
-    PanelHi = Color3.fromRGB(32, 32, 40),
-    Border = Color3.fromRGB(45, 45, 55),
-    Accent = Color3.fromRGB(140, 90, 255),
-    Text = Color3.fromRGB(240, 240, 245),
-    Dim = Color3.fromRGB(150, 150, 165),
-    Off = Color3.fromRGB(60, 60, 70),
-    Input = Color3.fromRGB(30, 30, 38),
-    InputF = Color3.fromRGB(40, 40, 52),
-    Danger = Color3.fromRGB(220, 70, 70),
-    Font = Enum.Font.Gotham,
-    Bold = Enum.Font.GothamBold,
+    BG      = Color3.fromRGB(20, 20, 24),      -- softer black
+    Panel   = Color3.fromRGB(28, 28, 34),      -- subtle panel
+    PanelHi = Color3.fromRGB(38, 38, 46),      -- hover state
+    Border  = Color3.fromRGB(48, 48, 58),      -- low-contrast border
+    Accent  = Color3.fromRGB(120, 90, 220),    -- dimmed purple
+    AccentSoft = Color3.fromRGB(120, 90, 220),
+    Text    = Color3.fromRGB(220, 220, 228),   -- softened white
+    Dim     = Color3.fromRGB(130, 130, 145),   -- muted gray
+    Off     = Color3.fromRGB(55, 55, 66),      -- toggle off
+    Input   = Color3.fromRGB(34, 34, 42),
+    InputF  = Color3.fromRGB(44, 44, 54),
+    Danger  = Color3.fromRGB(190, 70, 70),     -- dulled red
+    Font    = Enum.Font.Gotham,
+    Bold    = Enum.Font.GothamBold,
 }
 
 local function new(class, props)
@@ -90,13 +91,13 @@ function VBHUB:Load(title, subtitle)
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 14, 0, 16),
         BackgroundTransparency = 1, Text = title or "VBHUB",
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 17,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 14, 0, 38),
         BackgroundTransparency = 1, Text = subtitle or "",
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 12,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
     new("Frame", {
@@ -117,7 +118,7 @@ function VBHUB:Load(title, subtitle)
     local deleteBtn = new("TextButton", {
         Size = UDim2.new(0, 70, 0, 26), Position = UDim2.new(1, -106, 0, 8),
         BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
+        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, TextSize = 11,
         AutoButtonColor = false, Parent = main, ZIndex = 5,
     })
     corner(deleteBtn, 6)
@@ -186,9 +187,9 @@ function VBHUB:newTab(name)
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ScrollBarThickness = 6,
+        ScrollBarThickness = 5,
         ScrollBarImageColor3 = T.Accent,
-        ScrollBarImageTransparency = 0.2,
+        ScrollBarImageTransparency = 0.5,
         CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollingDirection = Enum.ScrollingDirection.Y,
@@ -342,7 +343,7 @@ function VBHUB:_toggle(page, label, desc, def, cb)
     local kn = new("Frame", {
         Size = UDim2.new(0, 18, 0, 18),
         Position = on and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
-        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = sw,
+        BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0, Parent = sw,
     })
     corner(kn, 9)
     sw.MouseButton1Click:Connect(function()
@@ -425,7 +426,7 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     local kn = new("Frame", {
         Size = UDim2.new(0, 14, 0, 14),
         Position = UDim2.new(val / 200, -7, 0.5, -7),
-        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+        BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0,
         ZIndex = 2, Parent = tr,
     })
     corner(kn, 7)
