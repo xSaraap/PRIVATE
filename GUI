@@ -1,4 +1,4 @@
--- VBHUB UI Library v1.1 (fixed)
+-- VBHUB UI Library v2.0 (rewritten clean)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -14,9 +14,6 @@ local function getGuiParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local Library = {}
-Library.__index = Library
-
 local Theme = {
     Background  = Color3.fromRGB(18, 18, 22),
     Panel       = Color3.fromRGB(24, 24, 30),
@@ -26,7 +23,6 @@ local Theme = {
     Text        = Color3.fromRGB(240, 240, 245),
     TextDim     = Color3.fromRGB(150, 150, 165),
     ToggleOff   = Color3.fromRGB(60, 60, 70),
-    ToggleOn    = Color3.fromRGB(140, 90, 255),
     Input       = Color3.fromRGB(30, 30, 38),
     InputFocus  = Color3.fromRGB(40, 40, 52),
     Danger      = Color3.fromRGB(220, 70, 70),
@@ -36,22 +32,18 @@ local Theme = {
 
 local function new(class, props)
     local inst = Instance.new(class)
-    for k, v in pairs(props or {}) do
-        inst[k] = v
-    end
+    for k, v in pairs(props or {}) do inst[k] = v end
     return inst
 end
 
-local function corner(parent, radius)
-    return new("UICorner", { CornerRadius = UDim.new(0, radius or 8), Parent = parent })
+local function corner(p, r)
+    return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p })
 end
 
-local function stroke(parent, color, thickness)
+local function stroke(p, c, t)
     return new("UIStroke", {
-        Color = color or Theme.Border,
-        Thickness = thickness or 1,
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-        Parent = parent,
+        Color = c or Theme.Border, Thickness = t or 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p,
     })
 end
 
@@ -62,9 +54,15 @@ local function tween(inst, time, props)
     return t
 end
 
--- ============ LOAD ============
-function Library:Load(title, subtitle)
+-- ============================================================
+local VBHUB = {}
+VBHUB.__index = VBHUB
+
+function VBHUB:Load(title, subtitle)
     if self.Main then return self end
+    self.Tabs = {}
+    self.TabCount = 0
+    self.ActiveTab = nil
 
     local parent = getGuiParent()
 
@@ -92,13 +90,13 @@ function Library:Load(title, subtitle)
 
     -- Sidebar
     local sidebar = new("Frame", {
-        Name = "Sidebar",
         Size = UDim2.new(0, 150, 1, 0),
         BackgroundColor3 = Theme.Panel,
         BorderSizePixel = 0,
         Parent = main,
     })
     corner(sidebar, 10)
+    self.Sidebar = sidebar
 
     -- Header
     new("TextLabel", {
@@ -112,7 +110,6 @@ function Library:Load(title, subtitle)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = sidebar,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 16),
         Position = UDim2.new(0, 14, 0, 38),
@@ -125,8 +122,8 @@ function Library:Load(title, subtitle)
         Parent = sidebar,
     })
 
-    -- Divider under header
-    local divider = new("Frame", {
+    -- Divider
+    new("Frame", {
         Size = UDim2.new(1, -16, 0, 1),
         Position = UDim2.new(0, 8, 0, 62),
         BackgroundColor3 = Theme.Border,
@@ -134,44 +131,33 @@ function Library:Load(title, subtitle)
         Parent = sidebar,
     })
 
-    -- Tab container
-    local tabHolder = new("ScrollingFrame", {
-        Name = "Tabs",
+    -- Tab holder
+    local tabHolder = new("Frame", {
         Size = UDim2.new(1, -16, 1, -78),
         Position = UDim2.new(0, 8, 0, 70),
         BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 3,
-        ScrollBarImageColor3 = Theme.Accent,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ClipsDescendants = true,
         Parent = sidebar,
     })
-
+    self.TabHolder = tabHolder
     new("UIListLayout", {
         Padding = UDim.new(0, 4),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = tabHolder,
     })
 
-    -- Content area
+    -- Content
     local content = new("Frame", {
-        Name = "Content",
         Size = UDim2.new(1, -160, 1, -20),
         Position = UDim2.new(0, 160, 0, 10),
         BackgroundTransparency = 1,
         Parent = main,
     })
-
-    self.TabHolder = tabHolder
     self.Content = content
-    self.ActiveTab = nil
-    self.TabCount = 0
 
     -- Drag bar
     local dragBar = new("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
-        Position = UDim2.new(0, 0, 0, 0),
         BackgroundTransparency = 1,
         Parent = main,
     })
@@ -201,7 +187,7 @@ function Library:Load(title, subtitle)
         screenGui.Enabled = false
     end)
 
-    -- UI visibility toggle (Right Control)
+    -- Right Ctrl toggle
     local uiVisible = true
     UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
@@ -211,7 +197,7 @@ function Library:Load(title, subtitle)
         end
     end)
 
-    -- Dragging
+    -- Drag
     local dragging, dragStart, startPos
     dragBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -224,11 +210,10 @@ function Library:Load(title, subtitle)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
+            local d = input.Position - dragStart
             main.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y)
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
@@ -241,13 +226,12 @@ function Library:Load(title, subtitle)
     return self
 end
 
--- ============ TAB ============
-function Library:newTab(name, icon)
-    local self2 = self
+-- ============================================================
+function VBHUB:newTab(name, icon)
     local order = self.TabCount
     self.TabCount = self.TabCount + 1
 
-    -- Sidebar button
+    -- Sidebar tab button
     local btn = new("TextButton", {
         Size = UDim2.new(1, 0, 0, 34),
         BackgroundColor3 = Theme.Panel,
@@ -283,7 +267,6 @@ function Library:newTab(name, icon)
 
     -- Content page
     local page = new("ScrollingFrame", {
-        Name = "Page_" .. name,
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -294,27 +277,24 @@ function Library:newTab(name, icon)
         Visible = false,
         Parent = self.Content,
     })
-
     new("UIListLayout", {
         Padding = UDim.new(0, 8),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = page,
     })
+    new("UIPadding", { PaddingRight = UDim.new(0, 6), Parent = page })
 
-    new("UIPadding", {
-        PaddingRight = UDim.new(0, 6),
-        Parent = page,
-    })
-
+    -- Tab object
     local tab = {
-        Library = self,
         Name = name,
         Button = btn,
         Label = btnLbl,
         Indicator = indicator,
         Page = page,
+        Library = self,
     }
 
+    -- Select handlers
     btn.MouseButton1Click:Connect(function()
         self:SelectTab(tab)
     end)
@@ -329,38 +309,35 @@ function Library:newTab(name, icon)
         end
     end)
 
+    -- Auto-select first tab
     if not self.ActiveTab then
         self:SelectTab(tab)
     end
 
-    -- Return tab with element methods mixed in
-    local tabMethods = {}
-    tabMethods.newInput = function(_, label, placeholder, callback)
-        return self2:_newInput(tab, label, placeholder, callback)
+    table.insert(self.Tabs, tab)
+
+    -- Attach element methods directly to this tab instance
+    local lib = self
+    tab.newInput = function(_, label, placeholder, callback)
+        return lib:_makeInput(page, label, placeholder, callback)
     end
-    tabMethods.newToggle = function(_, label, description, default, callback)
-        return self2:_newToggle(tab, label, description, default, callback)
+    tab.newToggle = function(_, label, description, default, callback)
+        return lib:_makeToggle(page, label, description, default, callback)
     end
-    tabMethods.newButton = function(_, label, description, callback)
-        return self2:_newButton(tab, label, description, callback)
+    tab.newButton = function(_, label, description, callback)
+        return lib:_makeButton(page, label, description, callback)
     end
-    tabMethods.newSlider = function(_, label, description, default, isPercent, callback)
-        return self2:_newSlider(tab, label, description, default, isPercent, callback)
+    tab.newSlider = function(_, label, description, default, isPercent, callback)
+        return lib:_makeSlider(page, label, description, default, isPercent, callback)
     end
-    tabMethods.newDropdown = function(_, label, description, options, callback)
-        return self2:_newDropdown(tab, label, description, options, callback)
-    end
-    tabMethods.newLabel = function(_, text)
-        return self2:_newLabel(tab, text)
+    tab.newDropdown = function(_, label, description, options, callback)
+        return lib:_makeDropdown(page, label, description, options, callback)
     end
 
-    return setmetatable(tabMethods, {
-        __index = tab,
-        __newindex = function(t, k, v) tab[k] = v end,
-    })
+    return tab
 end
 
-function Library:SelectTab(tab)
+function VBHUB:SelectTab(tab)
     if self.ActiveTab == tab then return end
     if self.ActiveTab then
         self.ActiveTab.Page.Visible = false
@@ -375,38 +352,23 @@ function Library:SelectTab(tab)
     tab.Indicator.Visible = true
 end
 
--- ============ ELEMENTS ============
-local function makeCard(parent, height)
+-- ============================================================
+-- ELEMENT BUILDERS (methods take the PAGE as first arg now)
+-- ============================================================
+local function makeCard(page, height)
     local card = new("Frame", {
         Size = UDim2.new(1, 0, 0, height),
         BackgroundColor3 = Theme.Panel,
         BorderSizePixel = 0,
-        Parent = parent,
+        Parent = page,
     })
     corner(card, 8)
     stroke(card, Theme.Border, 1)
     return card
 end
 
-function Library:_newLabel(tab, text)
-    local card = makeCard(tab.Page, 32)
-    new("TextLabel", {
-        Size = UDim2.new(1, -24, 1, 0),
-        Position = UDim2.new(0, 12, 0, 0),
-        BackgroundTransparency = 1,
-        Text = text,
-        TextColor3 = Theme.TextDim,
-        Font = Theme.Font,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = card,
-    })
-    return card
-end
-
-function Library:_newInput(tab, label, placeholder, callback)
-    local card = makeCard(tab.Page, 62)
-
+function VBHUB:_makeInput(page, label, placeholder, callback)
+    local card = makeCard(page, 62)
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
@@ -418,7 +380,6 @@ function Library:_newInput(tab, label, placeholder, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 26),
@@ -430,7 +391,6 @@ function Library:_newInput(tab, label, placeholder, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     local box = new("Frame", {
         Size = UDim2.new(1, -24, 0, 24),
         Position = UDim2.new(0, 12, 0, 42),
@@ -439,7 +399,6 @@ function Library:_newInput(tab, label, placeholder, callback)
         Parent = card,
     })
     corner(box, 6)
-
     local input = new("TextBox", {
         Size = UDim2.new(1, -16, 1, 0),
         Position = UDim2.new(0, 8, 0, 0),
@@ -454,7 +413,6 @@ function Library:_newInput(tab, label, placeholder, callback)
         ClearTextOnFocus = false,
         Parent = box,
     })
-
     input.Focused:Connect(function()
         tween(box, 0.1, { BackgroundColor3 = Theme.InputFocus })
     end)
@@ -462,12 +420,11 @@ function Library:_newInput(tab, label, placeholder, callback)
         tween(box, 0.1, { BackgroundColor3 = Theme.Input })
         if callback then callback(input.Text) end
     end)
-
     return card
 end
 
-function Library:_newToggle(tab, label, description, default, callback)
-    local card = makeCard(tab.Page, 58)
+function VBHUB:_makeToggle(page, label, description, default, callback)
+    local card = makeCard(page, 58)
     local enabled = default and true or false
 
     new("TextLabel", {
@@ -481,7 +438,6 @@ function Library:_newToggle(tab, label, description, default, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -80, 0, 28),
         Position = UDim2.new(0, 12, 0, 26),
@@ -495,22 +451,20 @@ function Library:_newToggle(tab, label, description, default, callback)
         TextYAlignment = Enum.TextYAlignment.Top,
         Parent = card,
     })
-
     local switch = new("TextButton", {
         Size = UDim2.new(0, 40, 0, 22),
         Position = UDim2.new(1, -52, 0.5, -11),
-        BackgroundColor3 = enabled and Theme.ToggleOn or Theme.ToggleOff,
+        BackgroundColor3 = enabled and Theme.Accent or Theme.ToggleOff,
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
         Parent = card,
     })
     corner(switch, 11)
-
     local knob = new("Frame", {
         Size = UDim2.new(0, 18, 0, 18),
         Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0,
         Parent = switch,
     })
@@ -519,30 +473,26 @@ function Library:_newToggle(tab, label, description, default, callback)
     switch.MouseButton1Click:Connect(function()
         enabled = not enabled
         tween(switch, 0.15, {
-            BackgroundColor3 = enabled and Theme.ToggleOn or Theme.ToggleOff
+            BackgroundColor3 = enabled and Theme.Accent or Theme.ToggleOff
         })
         tween(knob, 0.15, {
             Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
         })
         if callback then callback(enabled) end
     end)
-
     return card
 end
 
-function Library:_newButton(tab, label, description, callback)
-    local card = makeCard(tab.Page, 50)
-
+function VBHUB:_makeButton(page, label, description, callback)
+    local card = makeCard(page, 50)
     local btn = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
-        BackgroundColor3 = Theme.Panel,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
         Parent = card,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18),
         Position = UDim2.new(0, 12, 0, 8),
@@ -554,7 +504,6 @@ function Library:_newButton(tab, label, description, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 28),
@@ -566,7 +515,6 @@ function Library:_newButton(tab, label, description, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     btn.MouseEnter:Connect(function()
         tween(card, 0.1, { BackgroundColor3 = Theme.PanelLight })
     end)
@@ -576,12 +524,11 @@ function Library:_newButton(tab, label, description, callback)
     btn.MouseButton1Click:Connect(function()
         if callback then callback() end
     end)
-
     return card
 end
 
-function Library:_newSlider(tab, label, description, default, isPercent, callback)
-    local card = makeCard(tab.Page, 70)
+function VBHUB:_makeSlider(page, label, description, default, isPercent, callback)
+    local card = makeCard(page, 70)
     local min, max = 0, 200
     local value = default or 100
 
@@ -596,7 +543,6 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     local valLbl = new("TextLabel", {
         Size = UDim2.new(0, 50, 0, 18),
         Position = UDim2.new(1, -62, 0, 8),
@@ -608,7 +554,6 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         TextXAlignment = Enum.TextXAlignment.Right,
         Parent = card,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 14),
         Position = UDim2.new(0, 12, 0, 26),
@@ -620,7 +565,6 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     local track = new("Frame", {
         Size = UDim2.new(1, -24, 0, 8),
         Position = UDim2.new(0, 12, 0, 50),
@@ -629,7 +573,6 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         Parent = card,
     })
     corner(track, 4)
-
     local fill = new("Frame", {
         Size = UDim2.new((value - min) / (max - min), 0, 1, 0),
         BackgroundColor3 = Theme.Accent,
@@ -637,11 +580,10 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
         Parent = track,
     })
     corner(fill, 4)
-
     local knob = new("Frame", {
         Size = UDim2.new(0, 14, 0, 14),
         Position = UDim2.new((value - min) / (max - min), -7, 0.5, -7),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0,
         ZIndex = 2,
         Parent = track,
@@ -651,17 +593,16 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
 
     local dragging = false
     local function updateFromX(mouseX)
-        local trackPos = track.AbsolutePosition.X
-        local trackSize = track.AbsoluteSize.X
-        local rel = math.clamp((mouseX - trackPos) / trackSize, 0, 1)
-        local newVal = math.floor(min + rel * (max - min))
-        value = newVal
-        valLbl.Text = tostring(value)
+        local tp = track.AbsolutePosition.X
+        local ts = track.AbsoluteSize.X
+        local rel = math.clamp((mouseX - tp) / ts, 0, 1)
+        local v = math.floor(min + rel * (max - min))
+        value = v
+        valLbl.Text = tostring(v)
         fill.Size = UDim2.new(rel, 0, 1, 0)
         knob.Position = UDim2.new(rel, -7, 0.5, -7)
-        if callback then callback(value) end
+        if callback then callback(v) end
     end
-
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then
@@ -681,12 +622,11 @@ function Library:_newSlider(tab, label, description, default, isPercent, callbac
             dragging = false
         end
     end)
-
     return card
 end
 
-function Library:_newDropdown(tab, label, description, options, callback)
-    local card = makeCard(tab.Page, 62)
+function VBHUB:_makeDropdown(page, label, description, options, callback)
+    local card = makeCard(page, 62)
     local listOpen = false
 
     new("TextLabel", {
@@ -700,7 +640,6 @@ function Library:_newDropdown(tab, label, description, options, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-
     local selBox = new("TextButton", {
         Size = UDim2.new(1, -24, 0, 24),
         Position = UDim2.new(0, 12, 0, 32),
@@ -726,7 +665,6 @@ function Library:_newDropdown(tab, label, description, options, callback)
     })
     corner(popup, 6)
     stroke(popup, Theme.Border, 1)
-
     new("UIListLayout", {
         Padding = UDim.new(0, 2),
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -745,7 +683,6 @@ function Library:_newDropdown(tab, label, description, options, callback)
         popup.Visible = false
         card.Size = UDim2.new(1, 0, 0, 62)
     end
-
     local function openPopup()
         listOpen = true
         popup.Visible = true
@@ -753,7 +690,7 @@ function Library:_newDropdown(tab, label, description, options, callback)
     end
 
     for i, opt in ipairs(options) do
-        local optBtn = new("TextButton", {
+        local ob = new("TextButton", {
             Size = UDim2.new(1, 0, 0, 24),
             BackgroundColor3 = Theme.PanelLight,
             BackgroundTransparency = 1,
@@ -767,15 +704,13 @@ function Library:_newDropdown(tab, label, description, options, callback)
             AutoButtonColor = false,
             Parent = popup,
         })
-
-        optBtn.MouseEnter:Connect(function()
-            tween(optBtn, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent })
+        ob.MouseEnter:Connect(function()
+            tween(ob, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent })
         end)
-        optBtn.MouseLeave:Connect(function()
-            tween(optBtn, 0.1, { BackgroundTransparency = 1 })
+        ob.MouseLeave:Connect(function()
+            tween(ob, 0.1, { BackgroundTransparency = 1 })
         end)
-
-        optBtn.MouseButton1Click:Connect(function()
+        ob.MouseButton1Click:Connect(function()
             selBox.Text = tostring(opt)
             selBox.TextColor3 = Theme.Text
             closePopup()
@@ -786,8 +721,7 @@ function Library:_newDropdown(tab, label, description, options, callback)
     selBox.MouseButton1Click:Connect(function()
         if listOpen then closePopup() else openPopup() end
     end)
-
     return card
 end
 
-return Library
+return VBHUB
