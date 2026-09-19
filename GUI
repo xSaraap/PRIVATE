@@ -1,5 +1,5 @@
--- VBHUB UI v3.5
-print("[VBHUB] v3.5 loaded")
+-- VBHUB UI v3.6
+print("[VBHUB] v3.6 loaded")
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -68,8 +68,8 @@ function VBHUB:Load(title, subtitle)
     self.ScreenGui = sg
 
     local main = new("Frame", {
-        Size = UDim2.new(0, 620, 0, 620),
-        Position = UDim2.new(0.5, -310, 0.5, -310),
+        Size = UDim2.new(0, 820, 0, 620),
+        Position = UDim2.new(0.5, -410, 0.5, -310),
         BackgroundColor3 = T.BG, BorderSizePixel = 0, Parent = sg, Active = true,
     })
     corner(main, 10)
@@ -278,7 +278,7 @@ function VBHUB:_input(page, label, ph, cb)
     if type(ph) ~= "string" then ph = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 62)
+    local c = card(page, 88)
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1, Text = label,
@@ -286,13 +286,14 @@ function VBHUB:_input(page, label, ph, cb)
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 26),
+        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1, Text = ph,
         TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
     local box = new("Frame", {
-        Size = UDim2.new(1, -24, 0, 24), Position = UDim2.new(0, 12, 0, 42),
+        Size = UDim2.new(1, -24, 0, 24), Position = UDim2.new(0, 12, 0, 68),
         BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
     })
     corner(box, 6)
@@ -319,7 +320,7 @@ function VBHUB:_toggle(page, label, desc, def, cb)
     if type(desc) ~= "string" then desc = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 58)
+    local c = card(page, 74)
     local on = def and true or false
     new("TextLabel", {
         Size = UDim2.new(1, -80, 0, 18), Position = UDim2.new(0, 12, 0, 8),
@@ -328,7 +329,7 @@ function VBHUB:_toggle(page, label, desc, def, cb)
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -80, 0, 28), Position = UDim2.new(0, 12, 0, 26),
+        Size = UDim2.new(1, -80, 0, 44), Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1, Text = desc,
         TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
@@ -362,7 +363,7 @@ function VBHUB:_button(page, label, desc, cb)
     if type(desc) ~= "string" then desc = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 50)
+    local c = card(page, 68)
     local b = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
@@ -374,10 +375,11 @@ function VBHUB:_button(page, label, desc, cb)
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 28),
+        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1, Text = desc,
         TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
     b.MouseEnter:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.PanelHi }) end)
     b.MouseLeave:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.Panel }) end)
@@ -391,7 +393,7 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     if type(label) ~= "string" then label = tostring(label) end
     if type(def) ~= "number" then def = 100 end
 
-    local c = card(page, 70)
+    local c = card(page, 100)
     local val = def
     new("TextLabel", {
         Size = UDim2.new(1, -70, 0, 18), Position = UDim2.new(0, 12, 0, 8),
@@ -406,13 +408,14 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
         TextXAlignment = Enum.TextXAlignment.Right, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 26),
+        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
         BackgroundTransparency = 1, Text = desc,
         TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
     local tr = new("Frame", {
-        Size = UDim2.new(1, -24, 0, 8), Position = UDim2.new(0, 12, 0, 50),
+        Size = UDim2.new(1, -24, 0, 8), Position = UDim2.new(0, 12, 0, 78),
         BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
     })
     corner(tr, 4)
