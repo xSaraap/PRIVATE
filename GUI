@@ -68,7 +68,7 @@ function VBHUB:Load(title, subtitle)
     self.ScreenGui = sg
 
     local main = new("Frame", {
-        Size = UDim2.new(0, 820, 0, 620),
+        Size = UDim2.new(0, 120, 0, 620),
         Position = UDim2.new(0.5, -410, 0.5, -310),
         BackgroundColor3 = T.BG, BorderSizePixel = 0, Parent = sg, Active = true,
     })
@@ -82,44 +82,44 @@ function VBHUB:Load(title, subtitle)
     })
     corner(sidebar, 10)
     new("Frame", {
-        Size = UDim2.new(0, 20, 1, 0),
+         = UDim2.new(0, 20, 1, 0),
         Position = UDim2.new(1, -20, 0, 0),
-        BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = sidebar,
+        BackgroundColor3 = T.Panel, BorderPixel = 0, Parent = sidebar,
     })
     self.Sidebar = sidebar
 
     new("TextLabel", {
-        Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 14, 0, 16),
+         = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 14, 0, 16),
         BackgroundTransparency = 1, Text = title or "VBHUB",
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 17,
+        TextColor3 = T.Text, Font = T.Bold, Text = 17,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 14, 0, 38),
+         = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 14, 0, 38),
         BackgroundTransparency = 1, Text = subtitle or "",
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 12,
+        TextColor3 = T.Dim, Font = T.Font, Text = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
     new("Frame", {
-        Size = UDim2.new(1, -16, 0, 1), Position = UDim2.new(0, 8, 0, 62),
-        BackgroundColor3 = T.Border, BorderSizePixel = 0, Parent = sidebar,
+         = UDim2.new(1, -16, 0, 1), Position = UDim2.new(0, 8, 0, 62),
+        BackgroundColor3 = T.Border, BorderPixel = 0, Parent = sidebar,
     })
 
     local content = new("Frame", {
-        Size = UDim2.new(1, -160, 1, -20), Position = UDim2.new(0, 160, 0, 10),
+         = UDim2.new(1, -160, 1, -20), Position = UDim2.new(0, 160, 0, 10),
         BackgroundTransparency = 1, Parent = main,
     })
     self.Content = content
 
     local dragBar = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = main,
+         = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = main,
     })
 
     -- Hide/Show toggle button labeled "Delete"
     local deleteBtn = new("TextButton", {
-        Size = UDim2.new(0, 70, 0, 26), Position = UDim2.new(1, -106, 0, 8),
-        BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
+         = UDim2.new(0, 70, 0, 26), Position = UDim2.new(1, -106, 0, 8),
+        BackgroundColor3 = T.PanelHi, BorderPixel = 0,
+        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, Text = 12,
         AutoButtonColor = false, Parent = main, ZIndex = 5,
     })
     corner(deleteBtn, 6)
@@ -162,37 +162,37 @@ function VBHUB:newTab(name)
     local yPos = 70 + idx * 40
 
     local btn = new("TextButton", {
-        Size = UDim2.new(0, 126, 0, 34),
+         = UDim2.new(0, 126, 0, 34),
         Position = UDim2.new(0, 12, 0, yPos),
-        BackgroundColor3 = T.Panel, BorderSizePixel = 0,
+        BackgroundColor3 = T.Panel, BorderPixel = 0,
         Text = "", AutoButtonColor = false,
         Parent = self.Sidebar, ZIndex = 2,
     })
     corner(btn, 6)
 
     local lbl = new("TextLabel", {
-        Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 16, 0, 0),
+         = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 16, 0, 0),
         BackgroundTransparency = 1, Text = name,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 13,
+        TextColor3 = T.Dim, Font = T.Font, Text = 13,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = btn,
     })
 
     local ind = new("Frame", {
-        Size = UDim2.new(0, 3, 0, 18), Position = UDim2.new(0, 4, 0.5, -9),
-        BackgroundColor3 = T.Accent, BorderSizePixel = 0,
+         = UDim2.new(0, 3, 0, 18), Position = UDim2.new(0, 4, 0.5, -9),
+        BackgroundColor3 = T.Accent, BorderPixel = 0,
         Visible = false, Parent = btn,
     })
     corner(ind, 2)
 
     local page = new("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 1, 0),
+         = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
-        BorderSizePixel = 0,
+        BorderPixel = 0,
         ScrollBarThickness = 6,
         ScrollBarImageColor3 = T.Accent,
         ScrollBarImageTransparency = 0.2,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Canvas = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvas = Enum.Automatic.Y,
         ScrollingDirection = Enum.ScrollingDirection.Y,
         ElasticBehavior = Enum.ElasticBehavior.Never,
         Visible = false,
@@ -210,9 +210,9 @@ function VBHUB:newTab(name)
     })
 
     local function refreshCanvas()
-        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 24)
+        page.Canvas = UDim2.new(0, 0, 0, layout.AbsoluteContent.Y + 24)
     end
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas)
+    layout:GetPropertyChangedSignal("AbsoluteContent"):Connect(refreshCanvas)
     task.defer(refreshCanvas)
 
     local tab = { Name = name, Button = btn, Label = lbl, Indicator = ind, Page = page }
@@ -265,8 +265,8 @@ end
 
 local function card(parent, h)
     local c = new("Frame", {
-        Size = UDim2.new(1, 0, 0, h), BackgroundColor3 = T.Panel,
-        BorderSizePixel = 0, Parent = parent,
+         = UDim2.new(1, 0, 0, h), BackgroundColor3 = T.Panel,
+        BorderPixel = 0, Parent = parent,
     })
     corner(c, 8)
     stroke(c, T.Border, 1)
@@ -280,7 +280,7 @@ function VBHUB:_input(page, label, ph, cb)
 
     local c = card(page, 88)
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+         = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1, Text = label,
         TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
