@@ -1,5 +1,4 @@
 -- VBHUB UI v3.7
-print("[VBHUB] v3.7 loaded")
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
