@@ -1,4 +1,4 @@
--- VBHUB UI Library v2.0 (rewritten clean)
+-- VBHUB UI Library v2.1 (bulletproof layout)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -35,28 +35,29 @@ local function new(class, props)
     for k, v in pairs(props or {}) do inst[k] = v end
     return inst
 end
-
 local function corner(p, r)
     return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p })
 end
-
 local function stroke(p, c, t)
     return new("UIStroke", {
         Color = c or Theme.Border, Thickness = t or 1,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p,
     })
 end
-
 local function tween(inst, time, props)
-    local t = TweenService:Create(inst,
-        TweenInfo.new(time or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
-    t:Play()
-    return t
+    TweenService:Create(inst,
+        TweenInfo.new(time or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
--- ============================================================
 local VBHUB = {}
 VBHUB.__index = VBHUB
+
+-- Fixed dimensions — no dynamic layout
+local WIN_W, WIN_H = 560, 420
+local SIDEBAR_W = 150
+local TAB_H = 34
+local TAB_GAP = 6
+local TAB_START_Y = 70
 
 function VBHUB:Load(title, subtitle)
     if self.Main then return self end
@@ -64,21 +65,19 @@ function VBHUB:Load(title, subtitle)
     self.TabCount = 0
     self.ActiveTab = nil
 
-    local parent = getGuiParent()
-
     local screenGui = new("ScreenGui", {
         Name = "VBHUB",
         ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         IgnoreGuiInset = true,
-        Parent = parent,
+        Parent = getGuiParent(),
     })
     self.ScreenGui = screenGui
 
+    -- ===== MAIN WINDOW =====
     local main = new("Frame", {
-        Name = "Main",
-        Size = UDim2.new(0, 560, 0, 420),
-        Position = UDim2.new(0.5, -280, 0.5, -210),
+        Size = UDim2.new(0, WIN_W, 0, WIN_H),
+        Position = UDim2.new(0.5, -WIN_W/2, 0.5, -WIN_H/2),
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
         Parent = screenGui,
@@ -88,15 +87,22 @@ function VBHUB:Load(title, subtitle)
     stroke(main, Theme.Border, 1)
     self.Main = main
 
-    -- Sidebar
+    -- ===== SIDEBAR =====
     local sidebar = new("Frame", {
-        Size = UDim2.new(0, 150, 1, 0),
+        Size = UDim2.new(0, SIDEBAR_W, 1, 0),
         BackgroundColor3 = Theme.Panel,
         BorderSizePixel = 0,
         Parent = main,
     })
     corner(sidebar, 10)
-    self.Sidebar = sidebar
+    -- Hides the right-side rounded corners of sidebar
+    new("Frame", {
+        Size = UDim2.new(0, 20, 1, 0),
+        Position = UDim2.new(1, -20, 0, 0),
+        BackgroundColor3 = Theme.Panel,
+        BorderSizePixel = 0,
+        Parent = sidebar,
+    })
 
     -- Header
     new("TextLabel", {
@@ -121,7 +127,6 @@ function VBHUB:Load(title, subtitle)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = sidebar,
     })
-
     -- Divider
     new("Frame", {
         Size = UDim2.new(1, -16, 0, 1),
@@ -131,38 +136,25 @@ function VBHUB:Load(title, subtitle)
         Parent = sidebar,
     })
 
-    -- Tab holder
-    local tabHolder = new("Frame", {
-        Size = UDim2.new(1, -16, 1, -78),
-        Position = UDim2.new(0, 8, 0, 70),
-        BackgroundTransparency = 1,
-        ClipsDescendants = true,
-        Parent = sidebar,
-    })
-    self.TabHolder = tabHolder
-    new("UIListLayout", {
-        Padding = UDim.new(0, 4),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = tabHolder,
-    })
+    self.Sidebar = sidebar
 
-    -- Content
+    -- ===== CONTENT AREA =====
     local content = new("Frame", {
-        Size = UDim2.new(1, -160, 1, -20),
-        Position = UDim2.new(0, 160, 0, 10),
+        Size = UDim2.new(1, -SIDEBAR_W - 10, 1, -20),
+        Position = UDim2.new(0, SIDEBAR_W + 10, 0, 10),
         BackgroundTransparency = 1,
         Parent = main,
     })
     self.Content = content
 
-    -- Drag bar
+    -- ===== DRAG BAR =====
     local dragBar = new("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
         BackgroundTransparency = 1,
         Parent = main,
     })
 
-    -- Close button
+    -- ===== CLOSE BUTTON =====
     local closeBtn = new("TextButton", {
         Size = UDim2.new(0, 26, 0, 26),
         Position = UDim2.new(1, -34, 0, 8),
@@ -177,17 +169,11 @@ function VBHUB:Load(title, subtitle)
         ZIndex = 5,
     })
     corner(closeBtn, 6)
-    closeBtn.MouseEnter:Connect(function()
-        tween(closeBtn, 0.1, { BackgroundColor3 = Theme.Danger })
-    end)
-    closeBtn.MouseLeave:Connect(function()
-        tween(closeBtn, 0.1, { BackgroundColor3 = Theme.PanelLight })
-    end)
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui.Enabled = false
-    end)
+    closeBtn.MouseEnter:Connect(function() tween(closeBtn, 0.1, { BackgroundColor3 = Theme.Danger }) end)
+    closeBtn.MouseLeave:Connect(function() tween(closeBtn, 0.1, { BackgroundColor3 = Theme.PanelLight }) end)
+    closeBtn.MouseButton1Click:Connect(function() screenGui.Enabled = false end)
 
-    -- Right Ctrl toggle
+    -- ===== RIGHT CTRL TOGGLE =====
     local uiVisible = true
     UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
@@ -197,7 +183,7 @@ function VBHUB:Load(title, subtitle)
         end
     end)
 
-    -- Drag
+    -- ===== DRAG LOGIC =====
     local dragging, dragStart, startPos
     dragBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -228,18 +214,19 @@ end
 
 -- ============================================================
 function VBHUB:newTab(name, icon)
-    local order = self.TabCount
+    local index = self.TabCount
     self.TabCount = self.TabCount + 1
 
-    -- Sidebar tab button
+    -- ==== TAB BUTTON (fixed position, no layout!) ====
     local btn = new("TextButton", {
-        Size = UDim2.new(1, 0, 0, 34),
+        Size = UDim2.new(0, SIDEBAR_W - 24, 0, TAB_H),
+        Position = UDim2.new(0, 12, 0, TAB_START_Y + index * (TAB_H + TAB_GAP)),
         BackgroundColor3 = Theme.Panel,
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
-        LayoutOrder = order,
-        Parent = self.TabHolder,
+        Parent = self.Sidebar,
+        ZIndex = 2,
     })
     corner(btn, 6)
 
@@ -257,7 +244,7 @@ function VBHUB:newTab(name, icon)
 
     local indicator = new("Frame", {
         Size = UDim2.new(0, 3, 0, 18),
-        Position = UDim2.new(0, 6, 0.5, -9),
+        Position = UDim2.new(0, 4, 0.5, -9),
         BackgroundColor3 = Theme.Accent,
         BorderSizePixel = 0,
         Visible = false,
@@ -265,26 +252,21 @@ function VBHUB:newTab(name, icon)
     })
     corner(indicator, 2)
 
-    -- Content page
-    local page = new("ScrollingFrame", {
+    -- ==== PAGE (fixed size, no scroll layout) ====
+    local page = new("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 4,
-        ScrollBarImageColor3 = Theme.Accent,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
         Visible = false,
         Parent = self.Content,
     })
+
+    -- A UIListLayout inside the page for stacking cards
     new("UIListLayout", {
         Padding = UDim.new(0, 8),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = page,
     })
-    new("UIPadding", { PaddingRight = UDim.new(0, 6), Parent = page })
 
-    -- Tab object
     local tab = {
         Name = name,
         Button = btn,
@@ -292,9 +274,10 @@ function VBHUB:newTab(name, icon)
         Indicator = indicator,
         Page = page,
         Library = self,
+        PageLayout = page:FindFirstChildOfClass("UIListLayout"),
     }
 
-    -- Select handlers
+    -- Click handlers
     btn.MouseButton1Click:Connect(function()
         self:SelectTab(tab)
     end)
@@ -316,7 +299,7 @@ function VBHUB:newTab(name, icon)
 
     table.insert(self.Tabs, tab)
 
-    -- Attach element methods directly to this tab instance
+    -- ==== ELEMENT METHODS ====
     local lib = self
     tab.newInput = function(_, label, placeholder, callback)
         return lib:_makeInput(page, label, placeholder, callback)
@@ -353,7 +336,7 @@ function VBHUB:SelectTab(tab)
 end
 
 -- ============================================================
--- ELEMENT BUILDERS (methods take the PAGE as first arg now)
+-- ELEMENTS
 -- ============================================================
 local function makeCard(page, height)
     local card = new("Frame", {
@@ -413,9 +396,7 @@ function VBHUB:_makeInput(page, label, placeholder, callback)
         ClearTextOnFocus = false,
         Parent = box,
     })
-    input.Focused:Connect(function()
-        tween(box, 0.1, { BackgroundColor3 = Theme.InputFocus })
-    end)
+    input.Focused:Connect(function() tween(box, 0.1, { BackgroundColor3 = Theme.InputFocus }) end)
     input.FocusLost:Connect(function()
         tween(box, 0.1, { BackgroundColor3 = Theme.Input })
         if callback then callback(input.Text) end
@@ -469,12 +450,9 @@ function VBHUB:_makeToggle(page, label, description, default, callback)
         Parent = switch,
     })
     corner(knob, 9)
-
     switch.MouseButton1Click:Connect(function()
         enabled = not enabled
-        tween(switch, 0.15, {
-            BackgroundColor3 = enabled and Theme.Accent or Theme.ToggleOff
-        })
+        tween(switch, 0.15, { BackgroundColor3 = enabled and Theme.Accent or Theme.ToggleOff })
         tween(knob, 0.15, {
             Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
         })
@@ -515,15 +493,9 @@ function VBHUB:_makeButton(page, label, description, callback)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = card,
     })
-    btn.MouseEnter:Connect(function()
-        tween(card, 0.1, { BackgroundColor3 = Theme.PanelLight })
-    end)
-    btn.MouseLeave:Connect(function()
-        tween(card, 0.1, { BackgroundColor3 = Theme.Panel })
-    end)
-    btn.MouseButton1Click:Connect(function()
-        if callback then callback() end
-    end)
+    btn.MouseEnter:Connect(function() tween(card, 0.1, { BackgroundColor3 = Theme.PanelLight }) end)
+    btn.MouseLeave:Connect(function() tween(card, 0.1, { BackgroundColor3 = Theme.Panel }) end)
+    btn.MouseButton1Click:Connect(function() if callback then callback() end end)
     return card
 end
 
@@ -595,6 +567,7 @@ function VBHUB:_makeSlider(page, label, description, default, isPercent, callbac
     local function updateFromX(mouseX)
         local tp = track.AbsolutePosition.X
         local ts = track.AbsoluteSize.X
+        if ts <= 0 then return end
         local rel = math.clamp((mouseX - tp) / ts, 0, 1)
         local v = math.floor(min + rel * (max - min))
         value = v
@@ -653,7 +626,6 @@ function VBHUB:_makeDropdown(page, label, description, options, callback)
         Parent = card,
     })
     corner(selBox, 6)
-
     local popup = new("Frame", {
         Size = UDim2.new(1, -24, 0, #options * 26 + 8),
         Position = UDim2.new(0, 12, 1, 4),
@@ -671,13 +643,10 @@ function VBHUB:_makeDropdown(page, label, description, options, callback)
         Parent = popup,
     })
     new("UIPadding", {
-        PaddingTop = UDim.new(0, 4),
-        PaddingBottom = UDim.new(0, 4),
-        PaddingLeft = UDim.new(0, 4),
-        PaddingRight = UDim.new(0, 4),
+        PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+        PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4),
         Parent = popup,
     })
-
     local function closePopup()
         listOpen = false
         popup.Visible = false
@@ -688,7 +657,6 @@ function VBHUB:_makeDropdown(page, label, description, options, callback)
         popup.Visible = true
         card.Size = UDim2.new(1, 0, 0, 62 + #options * 26 + 12)
     end
-
     for i, opt in ipairs(options) do
         local ob = new("TextButton", {
             Size = UDim2.new(1, 0, 0, 24),
@@ -707,9 +675,7 @@ function VBHUB:_makeDropdown(page, label, description, options, callback)
         ob.MouseEnter:Connect(function()
             tween(ob, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent })
         end)
-        ob.MouseLeave:Connect(function()
-            tween(ob, 0.1, { BackgroundTransparency = 1 })
-        end)
+        ob.MouseLeave:Connect(function() tween(ob, 0.1, { BackgroundTransparency = 1 }) end)
         ob.MouseButton1Click:Connect(function()
             selBox.Text = tostring(opt)
             selBox.TextColor3 = Theme.Text
@@ -717,7 +683,6 @@ function VBHUB:_makeDropdown(page, label, description, options, callback)
             if callback then callback(opt) end
         end)
     end
-
     selBox.MouseButton1Click:Connect(function()
         if listOpen then closePopup() else openPopup() end
     end)
