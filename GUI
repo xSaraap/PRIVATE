@@ -1,0 +1,493 @@
+-- VBHUB UI v3
+print("[VBHUB] v3 loaded")
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function getGuiParent()
+    if gethui then
+        local ok, r = pcall(gethui)
+        if ok and r then return r end
+    end
+    local ok, r = pcall(function() return game:GetService("CoreGui") end)
+    if ok and r then return r end
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local T = {
+    BG = Color3.fromRGB(18, 18, 22),
+    Panel = Color3.fromRGB(24, 24, 30),
+    PanelHi = Color3.fromRGB(32, 32, 40),
+    Border = Color3.fromRGB(45, 45, 55),
+    Accent = Color3.fromRGB(140, 90, 255),
+    Text = Color3.fromRGB(240, 240, 245),
+    Dim = Color3.fromRGB(150, 150, 165),
+    Off = Color3.fromRGB(60, 60, 70),
+    Input = Color3.fromRGB(30, 30, 38),
+    InputF = Color3.fromRGB(40, 40, 52),
+    Danger = Color3.fromRGB(220, 70, 70),
+    Font = Enum.Font.Gotham,
+    Bold = Enum.Font.GothamBold,
+}
+
+local function new(class, props)
+    local i = Instance.new(class)
+    if props then for k, v in pairs(props) do i[k] = v end end
+    return i
+end
+local function corner(p, r)
+    return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p })
+end
+local function stroke(p, c, t)
+    return new("UIStroke", {
+        Color = c or T.Border, Thickness = t or 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p,
+    })
+end
+local function tw(i, tm, p)
+    TweenService:Create(i,
+        TweenInfo.new(tm or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), p):Play()
+end
+
+local VBHUB = {}
+VBHUB.__index = VBHUB
+
+function VBHUB:Load(title, subtitle)
+    if self.Main then return self end
+    self.Tabs = {}
+    self.TabIdx = 0
+    self.Active = nil
+
+    local sg = new("ScreenGui", {
+        Name = "VBHUB", ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        IgnoreGuiInset = true, Parent = getGuiParent(),
+    })
+    self.ScreenGui = sg
+
+    local main = new("Frame", {
+        Size = UDim2.new(0, 560, 0, 500),
+        Position = UDim2.new(0.5, -280, 0.5, -250),
+        BackgroundColor3 = T.BG, BorderSizePixel = 0, Parent = sg, Active = true,
+    })
+    corner(main, 10)
+    stroke(main, T.Border, 1)
+    self.Main = main
+
+    local sidebar = new("Frame", {
+        Size = UDim2.new(0, 150, 1, 0),
+        BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = main,
+    })
+    corner(sidebar, 10)
+    new("Frame", {
+        Size = UDim2.new(0, 20, 1, 0),
+        Position = UDim2.new(1, -20, 0, 0),
+        BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = sidebar,
+    })
+    self.Sidebar = sidebar
+
+    new("TextLabel", {
+        Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 14, 0, 16),
+        BackgroundTransparency = 1, Text = title or "VBHUB",
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 17,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 14, 0, 38),
+        BackgroundTransparency = 1, Text = subtitle or "",
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
+    })
+    new("Frame", {
+        Size = UDim2.new(1, -16, 0, 1), Position = UDim2.new(0, 8, 0, 62),
+        BackgroundColor3 = T.Border, BorderSizePixel = 0, Parent = sidebar,
+    })
+
+    local content = new("Frame", {
+        Size = UDim2.new(1, -160, 1, -20), Position = UDim2.new(0, 160, 0, 10),
+        BackgroundTransparency = 1, Parent = main,
+    })
+    self.Content = content
+
+    local dragBar = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = main,
+    })
+
+    local closeBtn = new("TextButton", {
+        Size = UDim2.new(0, 26, 0, 26), Position = UDim2.new(1, -34, 0, 8),
+        BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
+        Text = "×", TextColor3 = T.Text, Font = T.Bold, TextSize = 18,
+        AutoButtonColor = false, Parent = main, ZIndex = 5,
+    })
+    corner(closeBtn, 6)
+    closeBtn.MouseEnter:Connect(function() tw(closeBtn, 0.1, { BackgroundColor3 = T.Danger }) end)
+    closeBtn.MouseLeave:Connect(function() tw(closeBtn, 0.1, { BackgroundColor3 = T.PanelHi }) end)
+    closeBtn.MouseButton1Click:Connect(function() sg.Enabled = false end)
+
+    local visible = true
+    UserInputService.InputBegan:Connect(function(inp, gpe)
+        if gpe then return end
+        if inp.KeyCode == Enum.KeyCode.RightControl then
+            visible = not visible
+            sg.Enabled = visible
+        end
+    end)
+
+    local drag, ds, sp
+    dragBar.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            drag = true; ds = inp.Position; sp = main.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if drag and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then
+            local d = inp.Position - ds
+            main.Position = UDim2.new(
+                sp.X.Scale, sp.X.Offset + d.X,
+                sp.Y.Scale, sp.Y.Offset + d.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            drag = false
+        end
+    end)
+
+    return self
+end
+
+function VBHUB:newTab(name)
+    local idx = self.TabIdx
+    self.TabIdx = self.TabIdx + 1
+
+    local yPos = 70 + idx * 40
+
+    local btn = new("TextButton", {
+        Size = UDim2.new(0, 126, 0, 34),
+        Position = UDim2.new(0, 12, 0, yPos),
+        BackgroundColor3 = T.Panel, BorderSizePixel = 0,
+        Text = "", AutoButtonColor = false,
+        Parent = self.Sidebar, ZIndex = 2,
+    })
+    corner(btn, 6)
+
+    local lbl = new("TextLabel", {
+        Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 16, 0, 0),
+        BackgroundTransparency = 1, Text = name,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = btn,
+    })
+
+    local ind = new("Frame", {
+        Size = UDim2.new(0, 3, 0, 18), Position = UDim2.new(0, 4, 0.5, -9),
+        BackgroundColor3 = T.Accent, BorderSizePixel = 0,
+        Visible = false, Parent = btn,
+    })
+    corner(ind, 2)
+
+    local page = new("Frame", {
+        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+        Visible = false, Parent = self.Content,
+    })
+    new("UIListLayout", {
+        Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page,
+    })
+    new("UIPadding", { PaddingRight = UDim.new(0, 6), Parent = page })
+
+    local tab = { Name = name, Button = btn, Label = lbl, Indicator = ind, Page = page }
+
+    btn.MouseButton1Click:Connect(function() self:SelectTab(tab) end)
+    btn.MouseEnter:Connect(function()
+        if self.Active ~= tab then tw(btn, 0.1, { BackgroundColor3 = T.PanelHi }) end
+    end)
+    btn.MouseLeave:Connect(function()
+        if self.Active ~= tab then tw(btn, 0.1, { BackgroundColor3 = T.Panel }) end
+    end)
+
+    if not self.Active then self:SelectTab(tab) end
+    table.insert(self.Tabs, tab)
+
+    local lib = self
+    tab.newInput = function(_, l, p, cb) return lib:_input(page, l, p, cb) end
+    tab.newToggle = function(_, l, d, def, cb) return lib:_toggle(page, l, d, def, cb) end
+    tab.newButton = function(_, l, d, cb) return lib:_button(page, l, d, cb) end
+    tab.newSlider = function(_, l, d, def, pc, cb) return lib:_slider(page, l, d, def, pc, cb) end
+    tab.newDropdown = function(_, l, d, o, cb) return lib:_dropdown(page, l, d, o, cb) end
+
+    return tab
+end
+
+function VBHUB:SelectTab(tab)
+    if self.Active == tab then return end
+    if self.Active then
+        self.Active.Page.Visible = false
+        tw(self.Active.Button, 0.15, { BackgroundColor3 = T.Panel })
+        self.Active.Label.TextColor3 = T.Dim
+        self.Active.Indicator.Visible = false
+    end
+    self.Active = tab
+    tab.Page.Visible = true
+    tw(tab.Button, 0.15, { BackgroundColor3 = T.PanelHi })
+    tab.Label.TextColor3 = T.Text
+    tab.Indicator.Visible = true
+end
+
+local function card(parent, h)
+    local c = new("Frame", {
+        Size = UDim2.new(1, 0, 0, h), BackgroundColor3 = T.Panel,
+        BorderSizePixel = 0, Parent = parent,
+    })
+    corner(c, 8)
+    stroke(c, T.Border, 1)
+    return c
+end
+
+function VBHUB:_input(page, label, ph, cb)
+    local c = card(page, 62)
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 26),
+        BackgroundTransparency = 1, Text = ph or "",
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    local box = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 24), Position = UDim2.new(0, 12, 0, 42),
+        BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
+    })
+    corner(box, 6)
+    local inp = new("TextBox", {
+        Size = UDim2.new(1, -16, 1, 0), Position = UDim2.new(0, 8, 0, 0),
+        BackgroundTransparency = 1, Text = "",
+        PlaceholderText = "Input Here...",
+        PlaceholderColor3 = T.Dim, TextColor3 = T.Text,
+        Font = T.Font, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ClearTextOnFocus = false, Parent = box,
+    })
+    inp.Focused:Connect(function() tw(box, 0.1, { BackgroundColor3 = T.InputF }) end)
+    inp.FocusLost:Connect(function()
+        tw(box, 0.1, { BackgroundColor3 = T.Input })
+        if cb then cb(inp.Text) end
+    end)
+    return c
+end
+
+function VBHUB:_toggle(page, label, desc, def, cb)
+    local c = card(page, 58)
+    local on = def and true or false
+    new("TextLabel", {
+        Size = UDim2.new(1, -80, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -80, 0, 28), Position = UDim2.new(0, 12, 0, 26),
+        BackgroundTransparency = 1, Text = desc or "",
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
+    })
+    local sw = new("TextButton", {
+        Size = UDim2.new(0, 40, 0, 22), Position = UDim2.new(1, -52, 0.5, -11),
+        BackgroundColor3 = on and T.Accent or T.Off,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
+    })
+    corner(sw, 11)
+    local kn = new("Frame", {
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = on and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
+        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = sw,
+    })
+    corner(kn, 9)
+    sw.MouseButton1Click:Connect(function()
+        on = not on
+        tw(sw, 0.15, { BackgroundColor3 = on and T.Accent or T.Off })
+        tw(kn, 0.15, {
+            Position = on and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+        })
+        if cb then cb(on) end
+    end)
+    return c
+end
+
+function VBHUB:_button(page, label, desc, cb)
+    local c = card(page, 50)
+    local b = new("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 28),
+        BackgroundTransparency = 1, Text = desc or "",
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    b.MouseEnter:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.PanelHi }) end)
+    b.MouseLeave:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.Panel }) end)
+    b.MouseButton1Click:Connect(function() if cb then cb() end end)
+    return c
+end
+
+function VBHUB:_slider(page, label, desc, def, pc, cb)
+    local c = card(page, 70)
+    local val = def or 100
+    new("TextLabel", {
+        Size = UDim2.new(1, -70, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    local vl = new("TextLabel", {
+        Size = UDim2.new(0, 50, 0, 18), Position = UDim2.new(1, -62, 0, 8),
+        BackgroundTransparency = 1, Text = tostring(val),
+        TextColor3 = T.Accent, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 26),
+        BackgroundTransparency = 1, Text = desc or "",
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    local tr = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 8), Position = UDim2.new(0, 12, 0, 50),
+        BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
+    })
+    corner(tr, 4)
+    local fl = new("Frame", {
+        Size = UDim2.new(val / 200, 0, 1, 0),
+        BackgroundColor3 = T.Accent, BorderSizePixel = 0, Parent = tr,
+    })
+    corner(fl, 4)
+    local kn = new("Frame", {
+        Size = UDim2.new(0, 14, 0, 14),
+        Position = UDim2.new(val / 200, -7, 0.5, -7),
+        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+        ZIndex = 2, Parent = tr,
+    })
+    corner(kn, 7)
+    stroke(kn, T.Accent, 2)
+
+    local drag = false
+    local function upd(x)
+        local tp = tr.AbsolutePosition.X
+        local ts = tr.AbsoluteSize.X
+        if ts <= 0 then return end
+        local r = math.clamp((x - tp) / ts, 0, 1)
+        local v = math.floor(r * 200)
+        val = v
+        vl.Text = tostring(v)
+        fl.Size = UDim2.new(r, 0, 1, 0)
+        kn.Position = UDim2.new(r, -7, 0.5, -7)
+        if cb then cb(v) end
+    end
+    tr.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            drag = true; upd(inp.Position.X)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if drag and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then
+            upd(inp.Position.X)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            drag = false
+        end
+    end)
+    return c
+end
+
+function VBHUB:_dropdown(page, label, desc, options, cb)
+    local c = card(page, 62)
+    local open = false
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    local sb = new("TextButton", {
+        Size = UDim2.new(1, -24, 0, 24), Position = UDim2.new(0, 12, 0, 32),
+        BackgroundColor3 = T.Input, BorderSizePixel = 0,
+        Text = "Select...", TextColor3 = T.Dim,
+        Font = T.Font, TextSize = 12, AutoButtonColor = false, Parent = c,
+    })
+    corner(sb, 6)
+    local pp = new("Frame", {
+        Size = UDim2.new(1, -24, 0, #options * 26 + 8),
+        Position = UDim2.new(0, 12, 1, 4),
+        BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
+        Visible = false, ZIndex = 10, Parent = c,
+    })
+    corner(pp, 6)
+    stroke(pp, T.Border, 1)
+    new("UIListLayout", {
+        Padding = UDim.new(0, 2),
+        SortOrder = Enum.SortOrder.LayoutOrder, Parent = pp,
+    })
+    new("UIPadding", {
+        PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+        PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), Parent = pp,
+    })
+    local function close()
+        open = false
+        pp.Visible = false
+        c.Size = UDim2.new(1, 0, 0, 62)
+    end
+    local function openIt()
+        open = true
+        pp.Visible = true
+        c.Size = UDim2.new(1, 0, 0, 62 + #options * 26 + 12)
+    end
+    for i, o in ipairs(options) do
+        local ob = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundColor3 = T.PanelHi, BackgroundTransparency = 1,
+            BorderSizePixel = 0, Text = tostring(o),
+            TextColor3 = T.Text, Font = T.Font, TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            LayoutOrder = i, AutoButtonColor = false, Parent = pp,
+        })
+        ob.MouseEnter:Connect(function()
+            tw(ob, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = T.Accent })
+        end)
+        ob.MouseLeave:Connect(function()
+            tw(ob, 0.1, { BackgroundTransparency = 1 })
+        end)
+        ob.MouseButton1Click:Connect(function()
+            sb.Text = tostring(o)
+            sb.TextColor3 = T.Text
+            close()
+            if cb then cb(o) end
+        end)
+    end
+    sb.MouseButton1Click:Connect(function()
+        if open then close() else openIt() end
+    end)
+    return c
+end
+
+return VBHUB
