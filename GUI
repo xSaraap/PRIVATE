@@ -68,7 +68,7 @@ function VBHUB:Load(title, subtitle)
     self.ScreenGui = sg
 
     local main = new("Frame", {
-        Size = UDim2.new(0, 120, 0, 620),
+        Size = UDim2.new(0, 900, 0, 620),
         Position = UDim2.new(0.5, -410, 0.5, -310),
         BackgroundColor3 = T.BG, BorderSizePixel = 0, Parent = sg, Active = true,
     })
