@@ -1,6 +1,6 @@
--- SARAP UI v4.1 (MOBILE FRIENDLY)
+-- SARAP UI v4.2 (MOBILE FRIENDLY - FIXED SCALE)
 -- Floating reopen button = "ZH"
--- Adds: Close UI card + Delete Script card (via :AddCloseButton / :AddDeleteButton)
+-- Adds: Close UI card + Delete Script card
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Players          = game:GetService("Players")
@@ -16,17 +16,13 @@ local function getGuiParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Detect mobile / small-screen device
 local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
-                     or Vector2.new(1280, 720)
 
--- Decide window size: clamp to viewport (leave margin), minimum 320x400
-local WIN_W = math.clamp(viewport.X - 40, 320, 560)
-local WIN_H = math.clamp(viewport.Y - 80, 400, 620)
-
--- For very small screens, shrink sidebar too
-local SIDEBAR_W = isMobile and 96 or 130
+local function getViewport()
+    local cam = workspace.CurrentCamera
+    if cam then return cam.ViewportSize end
+    return Vector2.new(1280, 720)
+end
 
 local T = {
     BG      = Color3.fromRGB(20, 20, 24),
@@ -76,12 +72,23 @@ function VBHUB:Load(title, subtitle)
     self.Closed      = false
     self.Connections = {}
 
-    -- Detect viewport again (in case Load is called later)
-    local cam = workspace.CurrentCamera
-    if cam then viewport = cam.ViewportSize end
+    local vp = getViewport()
 
-    WIN_W = math.clamp(viewport.X - 40, 320, 560)
-    WIN_H = math.clamp(viewport.Y - 80, 400, 620)
+    -- MUCH smaller on mobile: clamp between 260 and 420 px wide
+    local WIN_W, WIN_H, SIDEBAR_W
+
+    if isMobile then
+        WIN_W     = math.clamp(vp.X * 0.55, 260, 420)
+        WIN_H     = math.clamp(vp.Y * 0.65, 340, 520)
+        SIDEBAR_W = 84
+    else
+        WIN_W     = math.clamp(vp.X * 0.45, 500, 720)
+        WIN_H     = math.clamp(vp.Y * 0.75, 440, 640)
+        SIDEBAR_W = 130
+    end
+
+    -- Scale factor for text on tiny screens
+    local textScale = isMobile and 0.9 or 1
 
     local sg = new("ScreenGui", {
         Name = "VBHUB", ResetOnSpawn = false,
@@ -100,10 +107,10 @@ function VBHUB:Load(title, subtitle)
     self.Main = main
 
     --========================================================
-    -- MOBILE TITLE / HEADER BAR (drag handle)
+    -- HEADER
     --========================================================
     local header = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 44),
+        Size = UDim2.new(1, 0, 0, 40),
         BackgroundColor3 = T.Panel,
         BorderSizePixel = 0, Parent = main,
     })
@@ -115,23 +122,24 @@ function VBHUB:Load(title, subtitle)
     })
 
     new("TextLabel", {
-        Size = UDim2.new(1, -100, 0, 22), Position = UDim2.new(0, 14, 0, 8),
+        Size = UDim2.new(1, -60, 0, 18), Position = UDim2.new(0, 10, 0, 6),
         BackgroundTransparency = 1, Text = self.Title,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 16,
+        TextColor3 = T.Text, Font = T.Bold,
+        TextSize = math.floor(14 * textScale),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = header,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -100, 0, 14), Position = UDim2.new(0, 14, 0, 28),
+        Size = UDim2.new(1, -60, 0, 12), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = self.Subtitle,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font,
+        TextSize = math.floor(10 * textScale),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = header,
     })
 
-    -- Close "X" button in header (mobile-friendly)
     local headerClose = new("TextButton", {
-        Size = UDim2.new(0, 36, 0, 36), Position = UDim2.new(1, -44, 0, 4),
+        Size = UDim2.new(0, 32, 0, 32), Position = UDim2.new(1, -40, 0, 4),
         BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Text = "✕", TextColor3 = T.Text, Font = T.Bold, TextSize = 16,
+        Text = "✕", TextColor3 = T.Text, Font = T.Bold, TextSize = 14,
         AutoButtonColor = false, Parent = header, ZIndex = 3,
     })
     corner(headerClose, 8)
@@ -140,8 +148,8 @@ function VBHUB:Load(title, subtitle)
     -- SIDEBAR
     --========================================================
     local sidebar = new("Frame", {
-        Size = UDim2.new(0, SIDEBAR_W, 1, -44),
-        Position = UDim2.new(0, 0, 0, 44),
+        Size = UDim2.new(0, SIDEBAR_W, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
         BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = main,
     })
     corner(sidebar, 10)
@@ -153,14 +161,14 @@ function VBHUB:Load(title, subtitle)
     self.Sidebar = sidebar
 
     local content = new("Frame", {
-        Size = UDim2.new(1, -(SIDEBAR_W + 10), 1, -54),
-        Position = UDim2.new(0, SIDEBAR_W + 10, 0, 44),
+        Size = UDim2.new(1, -(SIDEBAR_W + 8), 1, -48),
+        Position = UDim2.new(0, SIDEBAR_W + 8, 0, 44),
         BackgroundTransparency = 1, Parent = main,
     })
     self.Content = content
 
     --========================================================
-    -- DRAG (header bar)
+    -- DRAG
     --========================================================
     local drag, ds, sp
     table.insert(self.Connections, header.InputBegan:Connect(function(inp)
@@ -186,22 +194,22 @@ function VBHUB:Load(title, subtitle)
     end))
 
     --========================================================
-    -- FLOATING REOPEN BUTTON ("ZH") — bigger for touch
+    -- FLOATING ZH BUTTON
     --========================================================
     local floating = new("TextButton", {
         Name = "VBHUB_Floating",
-        Size = UDim2.new(0, 70, 0, 70),
-        Position = UDim2.new(0, 20, 0.5, -35),
+        Size = UDim2.new(0, 56, 0, 56),
+        Position = UDim2.new(0, 16, 0.5, -28),
         BackgroundColor3 = Color3.fromRGB(15, 15, 18),
         BorderSizePixel = 0,
         Text = "ZH",
         TextColor3 = Color3.fromRGB(220, 30, 45),
-        Font = T.Bold, TextSize = 24,
+        Font = T.Bold, TextSize = 20,
         AutoButtonColor = false,
         Visible = false,
         Parent = sg, ZIndex = 50,
     })
-    corner(floating, 16)
+    corner(floating, 14)
     stroke(floating, T.Border, 1)
 
     local fDrag, fDs, fSp, fMoved
@@ -229,9 +237,6 @@ function VBHUB:Load(title, subtitle)
         end
     end))
 
-    --========================================================
-    -- CLOSE / OPEN / DELETE
-    --========================================================
     local function closeUI()
         main.Visible     = false
         floating.Visible = true
@@ -254,7 +259,6 @@ function VBHUB:Load(title, subtitle)
     self.DeleteUI       = deleteUI
     self.FloatingButton = floating
 
-    -- Reopen on tap (only if it wasn't a drag)
     table.insert(self.Connections, floating.MouseButton1Click:Connect(function()
         if not fMoved then openUI() end
     end))
@@ -265,7 +269,6 @@ function VBHUB:Load(title, subtitle)
         tw(floating, 0.1, { BackgroundColor3 = Color3.fromRGB(15, 15, 18) })
     end))
 
-    -- Header X button
     table.insert(self.Connections, headerClose.MouseButton1Click:Connect(closeUI))
     table.insert(self.Connections, headerClose.MouseEnter:Connect(function()
         tw(headerClose, 0.1, { BackgroundColor3 = T.Danger })
@@ -274,17 +277,31 @@ function VBHUB:Load(title, subtitle)
         tw(headerClose, 0.1, { BackgroundColor3 = T.PanelHi })
     end))
 
+    -- Re-fit on viewport change (rotation, resize, fullscreen toggle)
+    table.insert(self.Connections, workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        local nvp = getViewport()
+        if isMobile then
+            WIN_W = math.clamp(nvp.X * 0.55, 260, 420)
+            WIN_H = math.clamp(nvp.Y * 0.65, 340, 520)
+        else
+            WIN_W = math.clamp(nvp.X * 0.45, 500, 720)
+            WIN_H = math.clamp(nvp.Y * 0.75, 440, 640)
+        end
+        main.Size = UDim2.new(0, WIN_W, 0, WIN_H)
+        main.Position = UDim2.new(0.5, -WIN_W / 2, 0.5, -WIN_H / 2)
+    end))
+
     return self
 end
 
 function VBHUB:newTab(name)
     local idx = self.TabIdx
     self.TabIdx = self.TabIdx + 1
-    local yPos = 10 + idx * 44
+    local yPos = 6 + idx * 36
 
     local btn = new("TextButton", {
-        Size = UDim2.new(1, -16, 0, 38),
-        Position = UDim2.new(0, 8, 0, yPos),
+        Size = UDim2.new(1, -12, 0, 32),
+        Position = UDim2.new(0, 6, 0, yPos),
         BackgroundColor3 = T.Panel, BorderSizePixel = 0,
         Text = "", AutoButtonColor = false,
         Parent = self.Sidebar, ZIndex = 2,
@@ -292,16 +309,16 @@ function VBHUB:newTab(name)
     corner(btn, 8)
 
     local lbl = new("TextLabel", {
-        Size = UDim2.new(1, -24, 1, 0), Position = UDim2.new(0, 20, 0, 0),
+        Size = UDim2.new(1, -18, 1, 0), Position = UDim2.new(0, 14, 0, 0),
         BackgroundTransparency = 1, Text = name,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 13,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = btn,
     })
 
     local ind = new("Frame", {
-        Size = UDim2.new(0, 3, 0, 20), Position = UDim2.new(0, 4, 0.5, -10),
+        Size = UDim2.new(0, 3, 0, 16), Position = UDim2.new(0, 3, 0.5, -8),
         BackgroundColor3 = T.Accent, BorderSizePixel = 0,
         Visible = false, Parent = btn,
     })
@@ -311,7 +328,7 @@ function VBHUB:newTab(name)
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ScrollBarThickness = 6,
+        ScrollBarThickness = 5,
         ScrollBarImageColor3 = T.Accent,
         ScrollBarImageTransparency = 0.5,
         CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -322,18 +339,18 @@ function VBHUB:newTab(name)
         Parent = self.Content,
     })
     local layout = new("UIListLayout", {
-        Padding = UDim.new(0, 8),
+        Padding = UDim.new(0, 6),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = page,
     })
     new("UIPadding", {
-        PaddingRight = UDim.new(0, 10),
-        PaddingBottom = UDim.new(0, 20),
+        PaddingRight = UDim.new(0, 8),
+        PaddingBottom = UDim.new(0, 14),
         Parent = page,
     })
 
     local function refreshCanvas()
-        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 24)
+        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 18)
     end
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas)
     task.defer(refreshCanvas)
@@ -401,31 +418,31 @@ function VBHUB:_input(page, label, ph, cb)
     if type(ph) ~= "string" then ph = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 92)
+    local c = card(page, 82)
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
+        Size = UDim2.new(1, -20, 0, 36), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = ph,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
     local box = new("Frame", {
-        Size = UDim2.new(1, -24, 0, 32), Position = UDim2.new(0, 12, 0, 72),
+        Size = UDim2.new(1, -20, 0, 28), Position = UDim2.new(0, 10, 0, 62),
         BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
     })
-    corner(box, 8)
+    corner(box, 6)
     local inp = new("TextBox", {
-        Size = UDim2.new(1, -16, 1, 0), Position = UDim2.new(0, 8, 0, 0),
+        Size = UDim2.new(1, -14, 1, 0), Position = UDim2.new(0, 7, 0, 0),
         BackgroundTransparency = 1, Text = "",
-        PlaceholderText = "Input Here...",
+        PlaceholderText = "Input...",
         PlaceholderColor3 = T.Dim, TextColor3 = T.Text,
-        Font = T.Font, TextSize = 13,
+        Font = T.Font, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Center,
         ClearTextOnFocus = false, Parent = box,
     })
@@ -443,40 +460,38 @@ function VBHUB:_toggle(page, label, desc, def, cb)
     if type(desc) ~= "string" then desc = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    -- Mobile: taller so text has room
-    local c = card(page, 84)
+    local c = card(page, 70)
     local on = def and true or false
     new("TextLabel", {
-        Size = UDim2.new(1, -90, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -76, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -90, 0, 46), Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -76, 0, 40), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = desc,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
-    -- Bigger switch for touch
     local sw = new("TextButton", {
-        Size = UDim2.new(0, 52, 0, 30), Position = UDim2.new(1, -64, 0.5, -15),
+        Size = UDim2.new(0, 44, 0, 26), Position = UDim2.new(1, -54, 0.5, -13),
         BackgroundColor3 = on and T.Accent or T.Off,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
     })
-    corner(sw, 15)
+    corner(sw, 13)
     local kn = new("Frame", {
-        Size = UDim2.new(0, 26, 0, 26),
-        Position = on and UDim2.new(1, -28, 0.5, -13) or UDim2.new(0, 2, 0.5, -13),
+        Size = UDim2.new(0, 22, 0, 22),
+        Position = on and UDim2.new(1, -24, 0.5, -11) or UDim2.new(0, 2, 0.5, -11),
         BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0, Parent = sw,
     })
-    corner(kn, 13)
+    corner(kn, 11)
     sw.MouseButton1Click:Connect(function()
         on = not on
         tw(sw, 0.15, { BackgroundColor3 = on and T.Accent or T.Off })
         tw(kn, 0.15, {
-            Position = on and UDim2.new(1, -28, 0.5, -13) or UDim2.new(0, 2, 0.5, -13)
+            Position = on and UDim2.new(1, -24, 0.5, -11) or UDim2.new(0, 2, 0.5, -11)
         })
         if cb then cb(on) end
     end)
@@ -488,21 +503,21 @@ function VBHUB:_button(page, label, desc, cb)
     if type(desc) ~= "string" then desc = "" end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 76)
+    local c = card(page, 64)
     local b = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 44), Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -20, 0, 38), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = desc,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
@@ -521,45 +536,44 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     local maxVal = (type(pc) == "number" and pc > 0) and pc or 200
     if maxVal < 1 then maxVal = 1 end
 
-    local c = card(page, 116)
+    local c = card(page, 100)
     local val = math.clamp(def, 0, maxVal)
     new("TextLabel", {
-        Size = UDim2.new(1, -80, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -60, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     local vl = new("TextLabel", {
-        Size = UDim2.new(0, 60, 0, 18), Position = UDim2.new(1, -72, 0, 10),
+        Size = UDim2.new(0, 50, 0, 16), Position = UDim2.new(1, -60, 0, 8),
         BackgroundTransparency = 1, Text = tostring(val),
-        TextColor3 = T.Accent, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Accent, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Right, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 44), Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -20, 0, 40), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = desc,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
-    -- Taller track + bigger knob for touch
     local tr = new("Frame", {
-        Size = UDim2.new(1, -24, 0, 14), Position = UDim2.new(0, 12, 0, 90),
+        Size = UDim2.new(1, -20, 0, 12), Position = UDim2.new(0, 10, 0, 76),
         BackgroundColor3 = T.Input, BorderSizePixel = 0, Parent = c,
     })
-    corner(tr, 7)
+    corner(tr, 6)
     local fl = new("Frame", {
         Size = UDim2.new(val / maxVal, 0, 1, 0),
         BackgroundColor3 = T.Accent, BorderSizePixel = 0, Parent = tr,
     })
-    corner(fl, 7)
+    corner(fl, 6)
     local kn = new("Frame", {
-        Size = UDim2.new(0, 22, 0, 22),
-        Position = UDim2.new(val / maxVal, -11, 0.5, -11),
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(val / maxVal, -10, 0.5, -10),
         BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0,
         ZIndex = 2, Parent = tr,
     })
-    corner(kn, 11)
+    corner(kn, 10)
     stroke(kn, T.Accent, 2)
 
     local drag = false
@@ -572,7 +586,7 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
         val = v
         vl.Text = tostring(v)
         fl.Size = UDim2.new(r, 0, 1, 0)
-        kn.Position = UDim2.new(r, -11, 0.5, -11)
+        kn.Position = UDim2.new(r, -10, 0.5, -10)
         if cb then cb(v) end
     end
     tr.InputBegan:Connect(function(inp)
@@ -604,28 +618,28 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     if type(options) ~= "table" then options = {} end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 70)
+    local c = card(page, 58)
     local open = false
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     local sb = new("TextButton", {
-        Size = UDim2.new(1, -24, 0, 32), Position = UDim2.new(0, 12, 0, 32),
+        Size = UDim2.new(1, -20, 0, 28), Position = UDim2.new(0, 10, 0, 26),
         BackgroundColor3 = T.Input, BorderSizePixel = 0,
         Text = "Select...", TextColor3 = T.Dim,
-        Font = T.Font, TextSize = 13, AutoButtonColor = false, Parent = c,
+        Font = T.Font, TextSize = 12, AutoButtonColor = false, Parent = c,
     })
-    corner(sb, 8)
+    corner(sb, 6)
     local pp = new("Frame", {
-        Size = UDim2.new(1, -24, 0, #options * 34 + 10),
-        Position = UDim2.new(0, 12, 1, 4),
+        Size = UDim2.new(1, -20, 0, #options * 28 + 8),
+        Position = UDim2.new(0, 10, 1, 4),
         BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
         Visible = false, ZIndex = 10, Parent = c,
     })
-    corner(pp, 8)
+    corner(pp, 6)
     stroke(pp, T.Border, 1)
     new("UIListLayout", {
         Padding = UDim.new(0, 2),
@@ -638,19 +652,19 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     local function close()
         open = false
         pp.Visible = false
-        c.Size = UDim2.new(1, 0, 0, 70)
+        c.Size = UDim2.new(1, 0, 0, 58)
     end
     local function openIt()
         open = true
         pp.Visible = true
-        c.Size = UDim2.new(1, 0, 0, 70 + #options * 34 + 14)
+        c.Size = UDim2.new(1, 0, 0, 58 + #options * 28 + 12)
     end
     for i, o in ipairs(options) do
         local ob = new("TextButton", {
-            Size = UDim2.new(1, 0, 0, 32),
+            Size = UDim2.new(1, 0, 0, 26),
             BackgroundColor3 = T.PanelHi, BackgroundTransparency = 1,
             BorderSizePixel = 0, Text = tostring(o),
-            TextColor3 = T.Text, Font = T.Font, TextSize = 13,
+            TextColor3 = T.Text, Font = T.Font, TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
             LayoutOrder = i, AutoButtonColor = false, Parent = pp,
         })
@@ -673,29 +687,26 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     return c
 end
 
---============================================================
--- Helper: add CLOSE card and DELETE card into any tab
---============================================================
 function VBHUB:AddCloseButton(tab, label, desc)
     if not tab or not tab.Page or not self.CloseUI then return end
     label = label or "Close UI"
     desc  = desc  or "Hide the menu. A floating ZH button will reopen it."
 
-    local c = card(tab.Page, 76)
+    local c = card(tab.Page, 64)
     local b = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 44), Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -20, 0, 38), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = desc,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
@@ -710,21 +721,21 @@ function VBHUB:AddDeleteButton(tab, label, desc)
     label = label or "Delete Script"
     desc  = desc  or "Completely remove the UI and stop the script."
 
-    local c = card(tab.Page, 76)
+    local c = card(tab.Page, 64)
     local b = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 10),
+        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
-        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
     new("TextLabel", {
-        Size = UDim2.new(1, -24, 0, 44), Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -20, 0, 38), Position = UDim2.new(0, 10, 0, 24),
         BackgroundTransparency = 1, Text = desc,
-        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
