@@ -1,4 +1,6 @@
--- SARAP UI v3.9 (modified: close button in Settings + floating reopen)
+-- SARAP UI v4.0
+-- Floating reopen button = "ZH"
+-- Adds: Close UI card + Delete Script card (via :AddCloseButton / :AddDeleteButton)
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Players          = game:GetService("Players")
@@ -14,14 +16,12 @@ local function getGuiParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Softened palette
 local T = {
     BG      = Color3.fromRGB(20, 20, 24),
     Panel   = Color3.fromRGB(28, 28, 34),
     PanelHi = Color3.fromRGB(38, 38, 46),
     Border  = Color3.fromRGB(48, 48, 58),
     Accent  = Color3.fromRGB(120, 90, 220),
-    AccentSoft = Color3.fromRGB(120, 90, 220),
     Text    = Color3.fromRGB(220, 220, 228),
     Dim     = Color3.fromRGB(130, 130, 145),
     Off     = Color3.fromRGB(55, 55, 66),
@@ -56,11 +56,13 @@ VBHUB.__index = VBHUB
 
 function VBHUB:Load(title, subtitle)
     if self.Main then return self end
-    self.Tabs = {}
-    self.TabIdx = 0
-    self.Active = nil
-    self.Title = title or "VBHUB"
-    self.Subtitle = subtitle or ""
+    self.Tabs        = {}
+    self.TabIdx      = 0
+    self.Active      = nil
+    self.Title       = title or "VBHUB"
+    self.Subtitle    = subtitle or ""
+    self.Closed      = false
+    self.Connections = {}
 
     local sg = new("ScreenGui", {
         Name = "VBHUB", ResetOnSpawn = false,
@@ -117,17 +119,15 @@ function VBHUB:Load(title, subtitle)
         Size = UDim2.new(1, -20, 0, 40), BackgroundTransparency = 1, Parent = main,
     })
 
-    --============================================================
-    -- DRAG
-    --============================================================
+    -- DRAG MAIN WINDOW
     local drag, ds, sp
-    dragBar.InputBegan:Connect(function(inp)
+    table.insert(self.Connections, dragBar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
             or inp.UserInputType == Enum.UserInputType.Touch then
             drag = true; ds = inp.Position; sp = main.Position
         end
-    end)
-    UserInputService.InputChanged:Connect(function(inp)
+    end))
+    table.insert(self.Connections, UserInputService.InputChanged:Connect(function(inp)
         if drag and (inp.UserInputType == Enum.UserInputType.MouseMovement
             or inp.UserInputType == Enum.UserInputType.Touch) then
             local d = inp.Position - ds
@@ -135,79 +135,86 @@ function VBHUB:Load(title, subtitle)
                 sp.X.Scale, sp.X.Offset + d.X,
                 sp.Y.Scale, sp.Y.Offset + d.Y)
         end
-    end)
-    UserInputService.InputEnded:Connect(function(inp)
+    end))
+    table.insert(self.Connections, UserInputService.InputEnded:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
             or inp.UserInputType == Enum.UserInputType.Touch then
             drag = false
         end
-    end)
+    end))
 
-    --============================================================
-    -- FLOATING REOPEN BUTTON (hidden while UI is open)
-    --============================================================
-    local reopen = new("TextButton", {
-        Name = "VBHUB_Reopen",
-        Size = UDim2.new(0, 130, 0, 40),
-        Position = UDim2.new(0, 20, 0.5, -20),
-        BackgroundColor3 = T.Accent,
+    -- FLOATING REOPEN BUTTON ("ZH")
+    local floating = new("TextButton", {
+        Name = "VBHUB_Floating",
+        Size = UDim2.new(0, 60, 0, 60),
+        Position = UDim2.new(0, 30, 0.5, -30),
+        BackgroundColor3 = Color3.fromRGB(15, 15, 18),
         BorderSizePixel = 0,
-        Text = "Open UI",
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        Font = T.Bold, TextSize = 13,
+        Text = "ZH",
+        TextColor3 = Color3.fromRGB(220, 30, 45),
+        Font = T.Bold, TextSize = 22,
         AutoButtonColor = false,
         Visible = false,
-        Parent = sg, ZIndex = 20,
+        Parent = sg, ZIndex = 50,
     })
-    corner(reopen, 8)
-    stroke(reopen, T.Border, 1)
+    corner(floating, 14)
+    stroke(floating, T.Border, 1)
 
-    -- make the reopen button draggable too
-    local rDrag, rDs, rSp
-    reopen.InputBegan:Connect(function(inp)
+    -- DRAG FLOATING BUTTON
+    local fDrag, fDs, fSp
+    table.insert(self.Connections, floating.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
             or inp.UserInputType == Enum.UserInputType.Touch then
-            rDrag = true; rDs = inp.Position; rSp = reopen.Position
+            fDrag = true; fDs = inp.Position; fSp = floating.Position
         end
-    end)
-    UserInputService.InputChanged:Connect(function(inp)
-        if rDrag and (inp.UserInputType == Enum.UserInputType.MouseMovement
+    end))
+    table.insert(self.Connections, UserInputService.InputChanged:Connect(function(inp)
+        if fDrag and (inp.UserInputType == Enum.UserInputType.MouseMovement
             or inp.UserInputType == Enum.UserInputType.Touch) then
-            local d = inp.Position - rDs
-            reopen.Position = UDim2.new(
-                rSp.X.Scale, rSp.X.Offset + d.X,
-                rSp.Y.Scale, rSp.Y.Offset + d.Y)
+            local d = inp.Position - fDs
+            floating.Position = UDim2.new(
+                fSp.X.Scale, fSp.X.Offset + d.X,
+                fSp.Y.Scale, fSp.Y.Offset + d.Y)
         end
-    end)
-    UserInputService.InputEnded:Connect(function(inp)
+    end))
+    table.insert(self.Connections, UserInputService.InputEnded:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
             or inp.UserInputType == Enum.UserInputType.Touch then
-            rDrag = false
+            fDrag = false
         end
-    end)
+    end))
 
-    --============================================================
-    -- CLOSE / OPEN HELPERS
-    --============================================================
+    -- CLOSE / OPEN / DELETE ACTIONS
     local function closeUI()
-        main.Visible = false
-        reopen.Visible = true
+        main.Visible     = false
+        floating.Visible = true
     end
     local function openUI()
-        main.Visible = true
-        reopen.Visible = false
+        main.Visible     = true
+        floating.Visible = false
     end
 
-    self.CloseUI = closeUI
-    self.OpenUI  = openUI
-    self.ReopenButton = reopen
+    local function deleteUI()
+        self.Closed = true
+        for _, c in ipairs(self.Connections) do
+            pcall(function() c:Disconnect() end)
+        end
+        self.Connections = {}
+        pcall(function() sg:Destroy() end)
+    end
 
-    reopen.MouseButton1Click:Connect(openUI)
-    reopen.MouseEnter:Connect(function() tw(reopen, 0.1, { BackgroundColor3 = T.PanelHi, TextColor3 = T.Text }) end)
-    reopen.MouseLeave:Connect(function() tw(reopen, 0.1, { BackgroundColor3 = T.Accent,   TextColor3 = Color3.fromRGB(255,255,255) }) end)
+    self.CloseUI        = closeUI
+    self.OpenUI         = openUI
+    self.DeleteUI       = deleteUI
+    self.FloatingButton = floating
 
-    -- Note: the old top-right "Delete" button is removed.
-    -- The Close button is now injected into the Settings tab below.
+    table.insert(self.Connections, floating.MouseButton1Click:Connect(openUI))
+    table.insert(self.Connections, floating.MouseEnter:Connect(function()
+        tw(floating, 0.1, { BackgroundColor3 = Color3.fromRGB(30, 30, 36) })
+    end))
+    table.insert(self.Connections, floating.MouseLeave:Connect(function()
+        tw(floating, 0.1, { BackgroundColor3 = Color3.fromRGB(15, 15, 18) })
+    end))
 
     return self
 end
@@ -215,7 +222,6 @@ end
 function VBHUB:newTab(name)
     local idx = self.TabIdx
     self.TabIdx = self.TabIdx + 1
-
     local yPos = 70 + idx * 40
 
     local btn = new("TextButton", {
@@ -450,11 +456,11 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     if type(label) ~= "string" then label = tostring(label) end
     if type(def) ~= "number" then def = 100 end
 
-    -- pc is the max value (kept for API compat; defaults to 200 if missing)
     local maxVal = (type(pc) == "number" and pc > 0) and pc or 200
+    if maxVal < 1 then maxVal = 1 end
 
     local c = card(page, 100)
-    local val = def
+    local val = math.clamp(def, 0, maxVal)
     new("TextLabel", {
         Size = UDim2.new(1, -70, 0, 18), Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1, Text = label,
@@ -605,35 +611,18 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
 end
 
 --============================================================
--- CLOSE BUTTON INJECTION HELPERS
--- These let any hub add a "Close UI" button to a tab.
+-- Helper: add CLOSE card and DELETE card into any tab
 --============================================================
-
--- Add a red Close UI button to a specific tab.
--- Usage:  VBHUB:AddCloseButton(SomeTab, "Close UI", "Hide this menu.")
 function VBHUB:AddCloseButton(tab, label, desc)
-    if not tab or not tab.Page then return end
-    if not self.CloseUI then return end
-
+    if not tab or not tab.Page or not self.CloseUI then return end
     label = label or "Close UI"
-    desc  = desc  or "Hide the menu. A floating button will appear to reopen it."
+    desc  = desc  or "Hide the menu. A floating ZH button will reopen it."
 
-    local closeUI = self.CloseUI
-
-    -- Build a card like a normal button, but with red styling
-    local page = tab.Page
-    local c = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 68),
-        BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = page,
-    })
-    corner(c, 8)
-    stroke(c, T.Border, 1)
-
+    local c = card(tab.Page, 68)
     local b = new("TextButton", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
     })
-
     new("TextLabel", {
         Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
         BackgroundTransparency = 1, Text = label,
@@ -647,17 +636,38 @@ function VBHUB:AddCloseButton(tab, label, desc)
         TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
     })
+    b.MouseEnter:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.PanelHi }) end)
+    b.MouseLeave:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.Panel }) end)
+    b.MouseButton1Click:Connect(function() self.CloseUI() end)
+    return c
+end
 
-    b.MouseEnter:Connect(function()
-        tw(c, 0.1, { BackgroundColor3 = T.Danger })
-    end)
-    b.MouseLeave:Connect(function()
-        tw(c, 0.1, { BackgroundColor3 = T.Panel })
-    end)
-    b.MouseButton1Click:Connect(function()
-        closeUI()
-    end)
+function VBHUB:AddDeleteButton(tab, label, desc)
+    if not tab or not tab.Page or not self.DeleteUI then return end
+    label = label or "Delete Script"
+    desc  = desc  or "Completely remove the UI and stop the script."
 
+    local c = card(tab.Page, 68)
+    local b = new("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
+        BackgroundTransparency = 1, Text = desc,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
+    })
+    b.MouseEnter:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.Danger }) end)
+    b.MouseLeave:Connect(function() tw(c, 0.1, { BackgroundColor3 = T.Panel }) end)
+    b.MouseButton1Click:Connect(function() self.DeleteUI() end)
     return c
 end
 
