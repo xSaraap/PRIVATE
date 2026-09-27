@@ -160,7 +160,35 @@ local function GetEggInfo(Egg)
 end
 
 --============================================================
--- 9. FIND BEST EGG
+-- 9. FILTER MATCH (fuzzy + empty fallback)
+--============================================================
+
+local function IsFilterEmpty()
+    for _ in pairs(Config.EggFilter) do
+        return false
+    end
+    return true
+end
+
+local function MatchesFilter(EggName)
+    -- If filter is empty, allow everything (so auto-steal never freezes)
+    if IsFilterEmpty() then return true end
+
+    local eggLower = string.lower(EggName)
+    for picked in pairs(Config.EggFilter) do
+        local p = string.lower(picked)
+        if eggLower == p
+           or string.find(eggLower, p, 1, true)
+           or string.find(p, eggLower, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+--============================================================
+-- 10. FIND BEST EGG
 --============================================================
 
 local function FindBestEgg()
@@ -179,9 +207,7 @@ local function FindBestEgg()
         if EggName and typeof(Position) == "Vector3" then
             local PassFilter = true
             if Config.UseFilter then
-                if not Config.EggFilter[EggName] then
-                    PassFilter = false
-                end
+                PassFilter = MatchesFilter(EggName)
             end
 
             if PassFilter then
@@ -213,7 +239,7 @@ local function FindBestEgg()
 end
 
 --============================================================
--- 10. STOP MOVEMENT
+-- 11. STOP MOVEMENT
 --============================================================
 
 local CurrentTween = nil
@@ -237,7 +263,7 @@ local function StopMovement()
 end
 
 --============================================================
--- 11. FLY
+-- 12. FLY
 --============================================================
 
 local function FlyTo(Position)
@@ -298,13 +324,12 @@ local function FlyTo(Position)
 end
 
 --============================================================
--- 12. TELEPORT (simple, no verification)
+-- 13. TELEPORT (simple, with cooldown)
 --============================================================
 
 local lastTeleport = 0
 
 local function TeleportTo(Position)
-    -- enforce cooldown BEFORE teleporting
     local now = os.clock()
     local elapsed = now - lastTeleport
     if elapsed < Config.TeleCooldown then
@@ -320,15 +345,13 @@ local function TeleportTo(Position)
     Root.CFrame = CFrame.new(Position) * Root.CFrame.Rotation
 
     lastTeleport = os.clock()
-
-    -- one frame for the client to apply
     task.wait()
 
     return true
 end
 
 --============================================================
--- 13. GET PLOT
+-- 14. GET PLOT
 --============================================================
 
 local function GetPlotPosition()
@@ -355,7 +378,7 @@ local function GetPlotPosition()
 end
 
 --============================================================
--- 14. RETURN POSITION
+-- 15. RETURN POSITION
 --============================================================
 
 local function GetReturnPosition()
@@ -364,7 +387,7 @@ local function GetReturnPosition()
 end
 
 --============================================================
--- 15. PICKUP
+-- 16. PICKUP
 --============================================================
 
 local function GetBasketCount()
@@ -399,7 +422,7 @@ local function PickupEgg(Egg)
 end
 
 --============================================================
--- 16. RETURN HOME
+-- 17. RETURN HOME
 --============================================================
 
 local function ReturnHome()
@@ -413,7 +436,7 @@ local function ReturnHome()
 end
 
 --============================================================
--- 17. AUTO STEAL LOOP
+-- 18. AUTO STEAL LOOP
 --============================================================
 
 local function AutoStealLoop()
@@ -442,7 +465,6 @@ local function AutoStealLoop()
 
             if not Reached then task.wait(0.25); continue end
 
-            -- settle before pickup
             task.wait(0.08)
 
             local Picked = false
@@ -467,7 +489,7 @@ local function AutoStealLoop()
 end
 
 --============================================================
--- 18. EGG ESP
+-- 19. EGG ESP
 --============================================================
 
 local ESPObjects = {}
@@ -554,7 +576,7 @@ task.spawn(function()
 end)
 
 --============================================================
--- 19. BUILD UI
+-- 20. BUILD UI
 --============================================================
 
 local Hub = VBHUB:Load("ZENNY HUB", "RIDE A PET • ENGLISH")
@@ -566,7 +588,7 @@ local ESPTab       = Hub:newTab("Egg ESP")
 local SettingsTab  = Hub:newTab("Settings")
 
 --============================================================
--- 20. AUTO STEAL TAB
+-- 21. AUTO STEAL TAB
 --============================================================
 
 MainTab:newToggle(
@@ -608,7 +630,7 @@ MainTab:newButton(
 )
 
 --============================================================
--- 21. EGG FILTER TAB
+-- 22. EGG FILTER TAB
 --============================================================
 
 local MultiDropdownAPIs = {}
@@ -658,7 +680,7 @@ for _, rarity in ipairs(RarityRenderOrder) do
 end
 
 --============================================================
--- 22. POINT TAB
+-- 23. POINT TAB
 --============================================================
 
 PointTab:newButton(
@@ -696,7 +718,7 @@ PointTab:newButton(
 )
 
 --============================================================
--- 23. EGG ESP TAB
+-- 24. EGG ESP TAB
 --============================================================
 
 ESPTab:newToggle(
@@ -716,7 +738,7 @@ ESPTab:newButton(
 )
 
 --============================================================
--- 24. SETTINGS TAB
+-- 25. SETTINGS TAB
 --============================================================
 
 SettingsTab:newSlider(
@@ -750,7 +772,7 @@ Hub:AddDeleteButton(
 )
 
 --============================================================
--- 25. ACTIVE EGG EVENTS
+-- 26. ACTIVE EGG EVENTS
 --============================================================
 
 if ActiveEggs then
@@ -764,7 +786,7 @@ if ActiveEggs then
 end
 
 --============================================================
--- 26. RESPAWN
+-- 27. RESPAWN
 --============================================================
 
 Player.CharacterAdded:Connect(function()
