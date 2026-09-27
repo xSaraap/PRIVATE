@@ -1,7 +1,8 @@
--- SARAP UI v4.3 (MOBILE FRIENDLY + TOGGLE SETTERS)
+-- SARAP UI v4.4 (MOBILE FRIENDLY + TOGGLE SETTERS + DROPDOWN FIX)
 -- Floating reopen button = "ZH"
 -- Adds: Close UI card + Delete Script card
--- newToggle now returns (card, setterFunction) — call setter(true/false) to flip visually
+-- newToggle / newSlider return (card, setterFunction)
+-- Fixed: dropdown now auto-resizes card and doesn't overlap other cards
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Players          = game:GetService("Players")
@@ -268,7 +269,6 @@ function VBHUB:Load(title, subtitle)
         tw(headerClose, 0.1, { BackgroundColor3 = T.PanelHi })
     end))
 
-    -- Auto re-fit on viewport change
     table.insert(self.Connections, workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
         local nvp = getViewport()
         if isMobile then
@@ -484,7 +484,6 @@ function VBHUB:_toggle(page, label, desc, def, cb)
     })
     corner(kn, 11)
 
-    -- Central function that sets visual + internal state
     local function apply(value, fireCallback)
         on = value and true or false
         tw(sw, 0.15, { BackgroundColor3 = on and T.Accent or T.Off })
@@ -494,14 +493,9 @@ function VBHUB:_toggle(page, label, desc, def, cb)
         if fireCallback and cb then cb(on) end
     end
 
-    sw.MouseButton1Click:Connect(function()
-        apply(not on, true)
-    end)
+    sw.MouseButton1Click:Connect(function() apply(not on, true) end)
 
-    -- Return card + setter
-    return c, function(value)
-        apply(value, true)
-    end
+    return c, function(value) apply(value, true) end
 end
 
 function VBHUB:_button(page, label, desc, cb)
@@ -625,6 +619,10 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     end
 end
 
+--============================================================
+-- DROPDOWN (fixed auto-resize)
+--============================================================
+
 function VBHUB:_dropdown(page, label, desc, options, cb)
     if type(desc) == "table" and options == nil then
         options = desc; desc = ""; cb = nil
@@ -633,29 +631,68 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     if type(options) ~= "table" then options = {} end
     if type(label) ~= "string" then label = tostring(label) end
 
-    local c = card(page, 58)
+    -- Compact mode when there's no description
+    local hasDesc = (#desc > 0)
+    local baseH   = hasDesc and 74 or 52
+    local rowH    = 26
+    local listPad = 10
+    local listH   = #options * rowH + listPad
+
+    local c = card(page, baseH)
     local open = false
+
+    -- Title
     new("TextLabel", {
-        Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 8),
+        Size = UDim2.new(1, -20, 0, 16),
+        Position = UDim2.new(0, 10, 0, 8),
         BackgroundTransparency = 1, Text = label,
         TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
+
+    -- Description (only if present)
+    if hasDesc then
+        new("TextLabel", {
+            Size = UDim2.new(1, -20, 0, 32),
+            Position = UDim2.new(0, 10, 0, 24),
+            BackgroundTransparency = 1, Text = desc,
+            TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
+        })
+    end
+
+    local selectY = hasDesc and 52 or 26
+
+    -- Select button
     local sb = new("TextButton", {
-        Size = UDim2.new(1, -20, 0, 28), Position = UDim2.new(0, 10, 0, 26),
+        Size = UDim2.new(1, -20, 0, 26),
+        Position = UDim2.new(0, 10, 0, selectY),
         BackgroundColor3 = T.Input, BorderSizePixel = 0,
         Text = "Select...", TextColor3 = T.Dim,
-        Font = T.Font, TextSize = 12, AutoButtonColor = false, Parent = c,
+        Font = T.Font, TextSize = 12,
+        AutoButtonColor = false, Parent = c,
     })
     corner(sb, 6)
-    local pp = new("Frame", {
-        Size = UDim2.new(1, -20, 0, #options * 28 + 8),
-        Position = UDim2.new(0, 10, 1, 4),
-        BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Visible = false, ZIndex = 10, Parent = c,
+
+    -- Hidden options list (rendered inside the same card)
+    local pp = new("ScrollingFrame", {
+        Size = UDim2.new(1, -20, 0, listH),
+        Position = UDim2.new(0, 10, 0, selectY + 30),
+        BackgroundColor3 = T.PanelHi,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 5, Parent = c,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = T.Accent,
+        ScrollBarImageTransparency = 0.5,
+        CanvasSize = UDim2.new(0, 0, 0, listH),
+        AutomaticCanvasSize = Enum.AutomaticSize.None,
     })
     corner(pp, 6)
     stroke(pp, T.Border, 1)
+
     new("UIListLayout", {
         Padding = UDim.new(0, 2),
         SortOrder = Enum.SortOrder.LayoutOrder, Parent = pp,
@@ -664,22 +701,24 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
         PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
         PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), Parent = pp,
     })
+
     local function close()
         open = false
         pp.Visible = false
-        c.Size = UDim2.new(1, 0, 0, 58)
+        c.Size = UDim2.new(1, 0, 0, baseH)
     end
     local function openIt()
         open = true
         pp.Visible = true
-        c.Size = UDim2.new(1, 0, 0, 58 + #options * 28 + 12)
+        c.Size = UDim2.new(1, 0, 0, baseH + listH + 6)
     end
+
     for i, o in ipairs(options) do
         local ob = new("TextButton", {
-            Size = UDim2.new(1, 0, 0, 26),
+            Size = UDim2.new(1, 0, 0, rowH - 2),
             BackgroundColor3 = T.PanelHi, BackgroundTransparency = 1,
             BorderSizePixel = 0, Text = tostring(o),
-            TextColor3 = T.Text, Font = T.Font, TextSize = 12,
+            TextColor3 = T.Text, Font = T.Font, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
             LayoutOrder = i, AutoButtonColor = false, Parent = pp,
         })
@@ -696,9 +735,11 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
             if cb then cb(o) end
         end)
     end
+
     sb.MouseButton1Click:Connect(function()
         if open then close() else openIt() end
     end)
+
     return c
 end
 
