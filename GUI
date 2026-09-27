@@ -1,8 +1,8 @@
--- SARAP UI v3.8
+-- SARAP UI v3.9 (modified: close button in Settings + floating reopen)
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local TweenService     = game:GetService("TweenService")
+local Players          = game:GetService("Players")
+local LocalPlayer      = Players.LocalPlayer
 
 local function getGuiParent()
     if gethui then
@@ -14,20 +14,20 @@ local function getGuiParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Softened palette: darker base, muted accent, lower contrast
+-- Softened palette
 local T = {
-    BG      = Color3.fromRGB(20, 20, 24),      -- softer black
-    Panel   = Color3.fromRGB(28, 28, 34),      -- subtle panel
-    PanelHi = Color3.fromRGB(38, 38, 46),      -- hover state
-    Border  = Color3.fromRGB(48, 48, 58),      -- low-contrast border
-    Accent  = Color3.fromRGB(120, 90, 220),    -- dimmed purple
+    BG      = Color3.fromRGB(20, 20, 24),
+    Panel   = Color3.fromRGB(28, 28, 34),
+    PanelHi = Color3.fromRGB(38, 38, 46),
+    Border  = Color3.fromRGB(48, 48, 58),
+    Accent  = Color3.fromRGB(120, 90, 220),
     AccentSoft = Color3.fromRGB(120, 90, 220),
-    Text    = Color3.fromRGB(220, 220, 228),   -- softened white
-    Dim     = Color3.fromRGB(130, 130, 145),   -- muted gray
-    Off     = Color3.fromRGB(55, 55, 66),      -- toggle off
+    Text    = Color3.fromRGB(220, 220, 228),
+    Dim     = Color3.fromRGB(130, 130, 145),
+    Off     = Color3.fromRGB(55, 55, 66),
     Input   = Color3.fromRGB(34, 34, 42),
     InputF  = Color3.fromRGB(44, 44, 54),
-    Danger  = Color3.fromRGB(190, 70, 70),     -- dulled red
+    Danger  = Color3.fromRGB(190, 70, 70),
     Font    = Enum.Font.Gotham,
     Bold    = Enum.Font.GothamBold,
 }
@@ -59,6 +59,8 @@ function VBHUB:Load(title, subtitle)
     self.Tabs = {}
     self.TabIdx = 0
     self.Active = nil
+    self.Title = title or "VBHUB"
+    self.Subtitle = subtitle or ""
 
     local sg = new("ScreenGui", {
         Name = "VBHUB", ResetOnSpawn = false,
@@ -90,13 +92,13 @@ function VBHUB:Load(title, subtitle)
 
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 14, 0, 16),
-        BackgroundTransparency = 1, Text = title or "VBHUB",
+        BackgroundTransparency = 1, Text = self.Title,
         TextColor3 = T.Text, Font = T.Bold, TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 14, 0, 38),
-        BackgroundTransparency = 1, Text = subtitle or "",
+        BackgroundTransparency = 1, Text = self.Subtitle,
         TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left, Parent = sidebar,
     })
@@ -112,22 +114,12 @@ function VBHUB:Load(title, subtitle)
     self.Content = content
 
     local dragBar = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Parent = main,
+        Size = UDim2.new(1, -20, 0, 40), BackgroundTransparency = 1, Parent = main,
     })
 
-    local deleteBtn = new("TextButton", {
-        Size = UDim2.new(0, 70, 0, 26), Position = UDim2.new(1, -106, 0, 8),
-        BackgroundColor3 = T.PanelHi, BorderSizePixel = 0,
-        Text = "Delete", TextColor3 = T.Text, Font = T.Bold, TextSize = 11,
-        AutoButtonColor = false, Parent = main, ZIndex = 5,
-    })
-    corner(deleteBtn, 6)
-    deleteBtn.MouseEnter:Connect(function() tw(deleteBtn, 0.1, { BackgroundColor3 = T.Danger }) end)
-    deleteBtn.MouseLeave:Connect(function() tw(deleteBtn, 0.1, { BackgroundColor3 = T.PanelHi }) end)
-    deleteBtn.MouseButton1Click:Connect(function()
-        main.Visible = not main.Visible
-    end)
-
+    --============================================================
+    -- DRAG
+    --============================================================
     local drag, ds, sp
     dragBar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
@@ -150,6 +142,72 @@ function VBHUB:Load(title, subtitle)
             drag = false
         end
     end)
+
+    --============================================================
+    -- FLOATING REOPEN BUTTON (hidden while UI is open)
+    --============================================================
+    local reopen = new("TextButton", {
+        Name = "VBHUB_Reopen",
+        Size = UDim2.new(0, 130, 0, 40),
+        Position = UDim2.new(0, 20, 0.5, -20),
+        BackgroundColor3 = T.Accent,
+        BorderSizePixel = 0,
+        Text = "Open UI",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = T.Bold, TextSize = 13,
+        AutoButtonColor = false,
+        Visible = false,
+        Parent = sg, ZIndex = 20,
+    })
+    corner(reopen, 8)
+    stroke(reopen, T.Border, 1)
+
+    -- make the reopen button draggable too
+    local rDrag, rDs, rSp
+    reopen.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            rDrag = true; rDs = inp.Position; rSp = reopen.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if rDrag and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then
+            local d = inp.Position - rDs
+            reopen.Position = UDim2.new(
+                rSp.X.Scale, rSp.X.Offset + d.X,
+                rSp.Y.Scale, rSp.Y.Offset + d.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+            rDrag = false
+        end
+    end)
+
+    --============================================================
+    -- CLOSE / OPEN HELPERS
+    --============================================================
+    local function closeUI()
+        main.Visible = false
+        reopen.Visible = true
+    end
+    local function openUI()
+        main.Visible = true
+        reopen.Visible = false
+    end
+
+    self.CloseUI = closeUI
+    self.OpenUI  = openUI
+    self.ReopenButton = reopen
+
+    reopen.MouseButton1Click:Connect(openUI)
+    reopen.MouseEnter:Connect(function() tw(reopen, 0.1, { BackgroundColor3 = T.PanelHi, TextColor3 = T.Text }) end)
+    reopen.MouseLeave:Connect(function() tw(reopen, 0.1, { BackgroundColor3 = T.Accent,   TextColor3 = Color3.fromRGB(255,255,255) }) end)
+
+    -- Note: the old top-right "Delete" button is removed.
+    -- The Close button is now injected into the Settings tab below.
 
     return self
 end
@@ -392,6 +450,9 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     if type(label) ~= "string" then label = tostring(label) end
     if type(def) ~= "number" then def = 100 end
 
+    -- pc is the max value (kept for API compat; defaults to 200 if missing)
+    local maxVal = (type(pc) == "number" and pc > 0) and pc or 200
+
     local c = card(page, 100)
     local val = def
     new("TextLabel", {
@@ -419,13 +480,13 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     })
     corner(tr, 4)
     local fl = new("Frame", {
-        Size = UDim2.new(val / 200, 0, 1, 0),
+        Size = UDim2.new(val / maxVal, 0, 1, 0),
         BackgroundColor3 = T.Accent, BorderSizePixel = 0, Parent = tr,
     })
     corner(fl, 4)
     local kn = new("Frame", {
         Size = UDim2.new(0, 14, 0, 14),
-        Position = UDim2.new(val / 200, -7, 0.5, -7),
+        Position = UDim2.new(val / maxVal, -7, 0.5, -7),
         BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0,
         ZIndex = 2, Parent = tr,
     })
@@ -438,7 +499,7 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
         local ts = tr.AbsoluteSize.X
         if ts <= 0 then return end
         local r = math.clamp((x - tp) / ts, 0, 1)
-        local v = math.floor(r * 200)
+        local v = math.floor(r * maxVal)
         val = v
         vl.Text = tostring(v)
         fl.Size = UDim2.new(r, 0, 1, 0)
@@ -540,6 +601,63 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     sb.MouseButton1Click:Connect(function()
         if open then close() else openIt() end
     end)
+    return c
+end
+
+--============================================================
+-- CLOSE BUTTON INJECTION HELPERS
+-- These let any hub add a "Close UI" button to a tab.
+--============================================================
+
+-- Add a red Close UI button to a specific tab.
+-- Usage:  VBHUB:AddCloseButton(SomeTab, "Close UI", "Hide this menu.")
+function VBHUB:AddCloseButton(tab, label, desc)
+    if not tab or not tab.Page then return end
+    if not self.CloseUI then return end
+
+    label = label or "Close UI"
+    desc  = desc  or "Hide the menu. A floating button will appear to reopen it."
+
+    local closeUI = self.CloseUI
+
+    -- Build a card like a normal button, but with red styling
+    local page = tab.Page
+    local c = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 68),
+        BackgroundColor3 = T.Panel, BorderSizePixel = 0, Parent = page,
+    })
+    corner(c, 8)
+    stroke(c, T.Border, 1)
+
+    local b = new("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = false, Parent = c,
+    })
+
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 18), Position = UDim2.new(0, 12, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+    new("TextLabel", {
+        Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 0, 26),
+        BackgroundTransparency = 1, Text = desc,
+        TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
+    })
+
+    b.MouseEnter:Connect(function()
+        tw(c, 0.1, { BackgroundColor3 = T.Danger })
+    end)
+    b.MouseLeave:Connect(function()
+        tw(c, 0.1, { BackgroundColor3 = T.Panel })
+    end)
+    b.MouseButton1Click:Connect(function()
+        closeUI()
+    end)
+
     return c
 end
 
