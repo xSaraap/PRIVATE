@@ -1,6 +1,7 @@
--- SARAP UI v4.2 (MOBILE FRIENDLY - FIXED SCALE)
+-- SARAP UI v4.3 (MOBILE FRIENDLY + TOGGLE SETTERS)
 -- Floating reopen button = "ZH"
 -- Adds: Close UI card + Delete Script card
+-- newToggle now returns (card, setterFunction) — call setter(true/false) to flip visually
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Players          = game:GetService("Players")
@@ -74,7 +75,6 @@ function VBHUB:Load(title, subtitle)
 
     local vp = getViewport()
 
-    -- MUCH smaller on mobile: clamp between 260 and 420 px wide
     local WIN_W, WIN_H, SIDEBAR_W
 
     if isMobile then
@@ -87,7 +87,6 @@ function VBHUB:Load(title, subtitle)
         SIDEBAR_W = 130
     end
 
-    -- Scale factor for text on tiny screens
     local textScale = isMobile and 0.9 or 1
 
     local sg = new("ScreenGui", {
@@ -106,9 +105,7 @@ function VBHUB:Load(title, subtitle)
     stroke(main, T.Border, 1)
     self.Main = main
 
-    --========================================================
     -- HEADER
-    --========================================================
     local header = new("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
         BackgroundColor3 = T.Panel,
@@ -144,9 +141,7 @@ function VBHUB:Load(title, subtitle)
     })
     corner(headerClose, 8)
 
-    --========================================================
     -- SIDEBAR
-    --========================================================
     local sidebar = new("Frame", {
         Size = UDim2.new(0, SIDEBAR_W, 1, -40),
         Position = UDim2.new(0, 0, 0, 40),
@@ -167,9 +162,7 @@ function VBHUB:Load(title, subtitle)
     })
     self.Content = content
 
-    --========================================================
     -- DRAG
-    --========================================================
     local drag, ds, sp
     table.insert(self.Connections, header.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
@@ -193,9 +186,7 @@ function VBHUB:Load(title, subtitle)
         end
     end))
 
-    --========================================================
     -- FLOATING ZH BUTTON
-    --========================================================
     local floating = new("TextButton", {
         Name = "VBHUB_Floating",
         Size = UDim2.new(0, 56, 0, 56),
@@ -277,7 +268,7 @@ function VBHUB:Load(title, subtitle)
         tw(headerClose, 0.1, { BackgroundColor3 = T.PanelHi })
     end))
 
-    -- Re-fit on viewport change (rotation, resize, fullscreen toggle)
+    -- Auto re-fit on viewport change
     table.insert(self.Connections, workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
         local nvp = getViewport()
         if isMobile then
@@ -369,17 +360,22 @@ function VBHUB:newTab(name)
     table.insert(self.Tabs, tab)
 
     local lib = self
+
     tab.newInput = function(_, l, p, cb)
         local r = lib:_input(page, l, p, cb); refreshCanvas(); return r
     end
     tab.newToggle = function(_, l, d, def, cb)
-        local r = lib:_toggle(page, l, d, def, cb); refreshCanvas(); return r
+        local r, setter = lib:_toggle(page, l, d, def, cb)
+        refreshCanvas()
+        return r, setter
     end
     tab.newButton = function(_, l, d, cb)
         local r = lib:_button(page, l, d, cb); refreshCanvas(); return r
     end
     tab.newSlider = function(_, l, d, def, pc, cb)
-        local r = lib:_slider(page, l, d, def, pc, cb); refreshCanvas(); return r
+        local r, setter = lib:_slider(page, l, d, def, pc, cb)
+        refreshCanvas()
+        return r, setter
     end
     tab.newDropdown = function(_, l, d, o, cb)
         local r = lib:_dropdown(page, l, d, o, cb); refreshCanvas(); return r
@@ -487,15 +483,25 @@ function VBHUB:_toggle(page, label, desc, def, cb)
         BackgroundColor3 = Color3.fromRGB(220, 220, 228), BorderSizePixel = 0, Parent = sw,
     })
     corner(kn, 11)
-    sw.MouseButton1Click:Connect(function()
-        on = not on
+
+    -- Central function that sets visual + internal state
+    local function apply(value, fireCallback)
+        on = value and true or false
         tw(sw, 0.15, { BackgroundColor3 = on and T.Accent or T.Off })
         tw(kn, 0.15, {
             Position = on and UDim2.new(1, -24, 0.5, -11) or UDim2.new(0, 2, 0.5, -11)
         })
-        if cb then cb(on) end
+        if fireCallback and cb then cb(on) end
+    end
+
+    sw.MouseButton1Click:Connect(function()
+        apply(not on, true)
     end)
-    return c
+
+    -- Return card + setter
+    return c, function(value)
+        apply(value, true)
+    end
 end
 
 function VBHUB:_button(page, label, desc, cb)
@@ -577,7 +583,7 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     stroke(kn, T.Accent, 2)
 
     local drag = false
-    local function upd(x)
+    local function upd(x, fire)
         local tp = tr.AbsolutePosition.X
         local ts = tr.AbsoluteSize.X
         if ts <= 0 then return end
@@ -587,18 +593,18 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
         vl.Text = tostring(v)
         fl.Size = UDim2.new(r, 0, 1, 0)
         kn.Position = UDim2.new(r, -10, 0.5, -10)
-        if cb then cb(v) end
+        if fire and cb then cb(v) end
     end
     tr.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
             or inp.UserInputType == Enum.UserInputType.Touch then
-            drag = true; upd(inp.Position.X)
+            drag = true; upd(inp.Position.X, true)
         end
     end)
     UserInputService.InputChanged:Connect(function(inp)
         if drag and (inp.UserInputType == Enum.UserInputType.MouseMovement
             or inp.UserInputType == Enum.UserInputType.Touch) then
-            upd(inp.Position.X)
+            upd(inp.Position.X, true)
         end
     end)
     UserInputService.InputEnded:Connect(function(inp)
@@ -607,7 +613,16 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
             drag = false
         end
     end)
-    return c
+
+    return c, function(value)
+        value = math.clamp(tonumber(value) or val, 0, maxVal)
+        val = value
+        vl.Text = tostring(value)
+        local r = value / maxVal
+        fl.Size = UDim2.new(r, 0, 1, 0)
+        kn.Position = UDim2.new(r, -10, 0.5, -10)
+        if cb then cb(value) end
+    end
 end
 
 function VBHUB:_dropdown(page, label, desc, options, cb)
