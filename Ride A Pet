@@ -1,5 +1,5 @@
 --============================================================
--- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.2)
+-- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.3)
 -- AUTO STEAL + FLY/TELEPORT MODE
 -- EGG FILTER + EGG ESP + SAVE POINT
 -- MOBILE SUPPORTED • NO KEY
@@ -50,56 +50,67 @@ local Config = {
     SavedPoint = nil,
     Stop       = false,
     Busy       = false,
-    UseFilter  = false,            -- if true, only target eggs in EggFilter
-    EggFilter  = {},               -- [EggName] = true
+    UseFilter  = false,
+    EggFilter  = {},
 }
 
 --============================================================
--- 5. EGG CATALOG (grouped by rarity) — UPDATED
+-- 5. EGG CATALOG (grouped by rarity — highest first)
 --============================================================
 
 local EggCatalog = {
-    Common = {
-        "White Egg",
-        "Brown Egg",
-    },
-    Rare = {
-        "Cracked Egg",
-        "Easter Egg",
-        "Striped Egg",
-        "Stone Egg",
-        "Leaf Egg",
-    },
-    Epic = {
-        "Mushroom Egg",
-        "Flower Egg",
-        "Lotus Egg",
-        "Slime Egg",
-        "Ice Egg",
-    },
-    Legendary = {
-        "Glass Egg",
-        "Golden Egg",
-    },
-    Mythic = {
-        "Crystal Egg",
-        "Skull Egg",
-        "Dominus Egg",
-        "Flaming Egg",
-        "Sinister Egg",
-        "Soul Egg",
-        "Dark Egg",
+    Ethereal = {
+        "Volcanic Egg",
+        "Solaris Egg",
+        "Cherub Egg",
+        "Blackhole Egg",
     },
     Divine = {
-        "Aurora Egg",
         "Galaxy Egg",
+        "Aurora Egg",
     },
-    Ethereal = {
-        "Blackhole Egg",
-        "Cherub Egg",
-        "Solaris Egg",
-        "Volcanic Egg",
+    Mythic = {
+        "Dark Egg",
+        "Soul Egg",
+        "Sinister Egg",
+        "Flaming Egg",
+        "Dominus Egg",
+        "Skull Egg",
+        "Crystal Egg",
     },
+    Legendary = {
+        "Golden Egg",
+        "Glass Egg",
+    },
+    Epic = {
+        "Ice Egg",
+        "Slime Egg",
+        "Lotus Egg",
+        "Flower Egg",
+        "Mushroom Egg",
+    },
+    Rare = {
+        "Leaf Egg",
+        "Stone Egg",
+        "Striped Egg",
+        "Easter Egg",
+        "Cracked Egg",
+    },
+    Common = {
+        "Brown Egg",
+        "White Egg",
+    },
+}
+
+-- Explicit order: highest → lowest. Used for UI rendering.
+local RarityRenderOrder = {
+    "Ethereal",
+    "Divine",
+    "Mythic",
+    "Legendary",
+    "Epic",
+    "Rare",
+    "Common",
 }
 
 local RarityOrder = {
@@ -179,7 +190,7 @@ local function GetEggInfo(Egg)
 end
 
 --============================================================
--- 9. FIND BEST EGG (respects EggFilter when enabled)
+-- 9. FIND BEST EGG (respects EggFilter)
 --============================================================
 
 local function FindBestEgg()
@@ -577,16 +588,16 @@ task.spawn(function()
 end)
 
 --============================================================
--- 19. BUILD UI (SARAP UI v4.2)
+-- 19. BUILD UI
 --============================================================
 
 local Hub = VBHUB:Load("ZENNY HUB", "RIDE A PET • ENGLISH")
 
-local MainTab     = Hub:newTab("Auto Steal")
-local EggFilterTab= Hub:newTab("Egg Filter")
-local PointTab    = Hub:newTab("Point")
-local ESPTab      = Hub:newTab("Egg ESP")
-local SettingsTab = Hub:newTab("Settings")
+local MainTab      = Hub:newTab("Auto Steal")
+local EggFilterTab = Hub:newTab("Egg Filter")
+local PointTab     = Hub:newTab("Point")
+local ESPTab       = Hub:newTab("Egg ESP")
+local SettingsTab  = Hub:newTab("Settings")
 
 --============================================================
 -- 20. AUTO STEAL TAB
@@ -635,7 +646,7 @@ MainTab:newButton(
 )
 
 --============================================================
--- 21. EGG FILTER TAB
+-- 21. EGG FILTER TAB (highest rarity first)
 --============================================================
 
 EggFilterTab:newToggle(
@@ -647,19 +658,18 @@ EggFilterTab:newToggle(
     end
 )
 
--- Store toggle setter handles so Select All / Clear All can update visuals
 local FilterToggles = {}
 
 EggFilterTab:newButton(
     "✅ SELECT ALL EGGS",
     "Turn on every egg in the filter list.",
     function()
-        for _, list in pairs(EggCatalog) do
-            for _, name in ipairs(list) do
+        for _, rarity in ipairs(RarityRenderOrder) do
+            for _, name in ipairs(EggCatalog[rarity]) do
                 Config.EggFilter[name] = true
             end
         end
-        for name, setter in pairs(FilterToggles) do
+        for _, setter in pairs(FilterToggles) do
             if setter then setter(true) end
         end
     end
@@ -670,34 +680,36 @@ EggFilterTab:newButton(
     "Turn off every egg in the filter list.",
     function()
         Config.EggFilter = {}
-        for name, setter in pairs(FilterToggles) do
+        for _, setter in pairs(FilterToggles) do
             if setter then setter(false) end
         end
     end
 )
 
--- Build the egg toggles per rarity
-for rarity, eggList in pairs(EggCatalog) do
-    EggFilterTab:newButton(
-        "─── " .. rarity .. " ───",
-        "",
-        function() end
-    )
-
-    for _, eggName in ipairs(eggList) do
-        local capturedName = eggName
-
-        local setter = EggFilterTab:newToggle(
-            "  " .. eggName,
+-- Render rarity sections from highest → lowest
+for _, rarity in ipairs(RarityRenderOrder) do
+    local eggList = EggCatalog[rarity]
+    if eggList then
+        EggFilterTab:newButton(
+            "─── " .. rarity .. " ───",
             "",
-            false,
-            function(State)
-                Config.EggFilter[capturedName] = State or nil
-            end
+            function() end
         )
 
-        -- The GUI library returns a setter via the toggle. If not, setter stays nil.
-        FilterToggles[capturedName] = setter
+        for _, eggName in ipairs(eggList) do
+            local capturedName = eggName
+
+            local _, setter = EggFilterTab:newToggle(
+                "  " .. eggName,
+                "",
+                false,
+                function(State)
+                    Config.EggFilter[capturedName] = State or nil
+                end
+            )
+
+            FilterToggles[capturedName] = setter
+        end
     end
 end
 
