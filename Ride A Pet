@@ -1,7 +1,7 @@
 --============================================================
--- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.3)
+-- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.4)
 -- AUTO STEAL + FLY/TELEPORT MODE
--- EGG FILTER (DROPDOWN) + EGG ESP + SAVE POINT
+-- EGG FILTER (PER RARITY) + EGG ESP + SAVE POINT
 -- MOBILE SUPPORTED • NO KEY
 --============================================================
 
@@ -43,15 +43,16 @@ end
 --============================================================
 
 local Config = {
-    AutoSteal  = false,
-    StealMode  = "Teleport",       -- "Teleport" | "Fly"
-    Speed      = 300,
-    EggESP     = false,
-    SavedPoint = nil,
-    Stop       = false,
-    Busy       = false,
-    UseFilter  = false,
-    EggFilter  = {},
+    AutoSteal   = false,
+    StealMode   = "Teleport",      -- "Teleport" | "Fly"
+    Speed       = 300,
+    TeleCooldown = 0.35,           -- seconds between teleports (fixes "didn't teleport back")
+    EggESP      = false,
+    SavedPoint  = nil,
+    Stop        = false,
+    Busy        = false,
+    UseFilter   = false,
+    EggFilter   = {},
 }
 
 --============================================================
@@ -104,13 +105,8 @@ local EggCatalog = {
 }
 
 local RarityRenderOrder = {
-    "Ethereal",
-    "Divine",
-    "Mythic",
-    "Legendary",
-    "Epic",
-    "Rare",
-    "Common",
+    "Ethereal", "Divine", "Mythic", "Legendary",
+    "Epic", "Rare", "Common",
 }
 
 local RarityOrder = {
@@ -289,7 +285,7 @@ local function FlyTo(Position)
     local Distance = (Root.Position - Position).Magnitude
     if Distance <= 3 then return true end
 
-    local Speed = math.clamp(tonumber(Config.Speed) or 300, 40, 600)
+    local Speed    = math.clamp(tonumber(Config.Speed) or 300, 40, 600)
     local Duration = math.max(0.1, Distance / Speed)
 
     local OldCollision = {}
@@ -316,7 +312,6 @@ local function FlyTo(Position)
             pcall(function() CurrentTween:Cancel() end)
             break
         end
-
         Root.AssemblyLinearVelocity  = Vector3.zero
         Root.AssemblyAngularVelocity = Vector3.zero
         task.wait()
@@ -340,18 +335,36 @@ local function FlyTo(Position)
 end
 
 --============================================================
--- 12. TELEPORT
+-- 12. TELEPORT (with safety checks)
 --============================================================
 
+local lastTeleport = 0
+
 local function TeleportTo(Position)
-    local _, _, Root = GetCharacter()
+    -- cooldown guard: prevents overlapping teleports that would cause a "didn't teleport back" glitch
+    local now = os.clock()
+    if now - lastTeleport < Config.TeleCooldown then
+        task.wait(Config.TeleCooldown - (now - lastTeleport))
+    end
+
+    local _, Humanoid, Root = GetCharacter()
     if not Root then return false end
 
     Root.AssemblyLinearVelocity  = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
 
+    -- use CFrame with rotation reset to avoid weird face-planting
     Root.CFrame = CFrame.new(Position) * Root.CFrame.Rotation
-    return true
+    lastTeleport = os.clock()
+
+    -- let the server catch up
+    task.wait(0.1)
+
+    -- verify
+    local _, _, NewRoot = GetCharacter()
+    if not NewRoot then return false end
+
+    return (NewRoot.Position - Position).Magnitude < 12
 end
 
 --============================================================
@@ -448,7 +461,7 @@ local function ReturnHome()
 end
 
 --============================================================
--- 17. AUTO STEAL LOOP
+-- 17. AUTO STEAL LOOP (with safety cooldowns)
 --============================================================
 
 local function AutoStealLoop()
@@ -471,27 +484,32 @@ local function AutoStealLoop()
             local Reached = false
             if Config.StealMode == "Teleport" then
                 Reached = TeleportTo(EggPosition)
-                task.wait(0.15)
             else
                 Reached = FlyTo(EggPosition)
             end
 
-            if not Reached then task.wait(0.2); continue end
+            if not Reached then task.wait(0.3); continue end
+
+            -- small settle delay before pickup attempt
+            task.wait(0.1)
 
             local Picked = false
             for _ = 1, 3 do
                 if not Config.AutoSteal or Config.Stop then break end
                 Picked = PickupEgg(BestEgg)
                 if Picked then break end
-                task.wait(0.1)
+                task.wait(0.15)
             end
 
             if Picked then
+                -- small wait for server to register basket change
+                task.wait(0.15)
                 ReturnHome()
             else
                 task.wait(0.3)
             end
 
+            -- final cooldown before next cycle
             task.wait(0.2)
         end
 
@@ -651,71 +669,67 @@ MainTab:newButton(
 )
 
 --============================================================
--- 21. EGG FILTER TAB (dropdown-based)
+-- 21. EGG FILTER TAB (per-rarity dropdowns)
 --============================================================
 
 EggFilterTab:newToggle(
     "🎯 USE EGG FILTER",
-    "When ON, Auto Steal only targets eggs you enabled in the list.",
+    "When ON, Auto Steal only targets eggs you've picked below.",
     false,
     function(State)
         Config.UseFilter = State
     end
 )
 
--- Build the full egg name list (highest → lowest)
-local AllEggNames = {}
-for _, rarity in ipairs(RarityRenderOrder) do
-    local list = EggCatalog[rarity]
-    if list then
-        for _, name in ipairs(list) do
-            table.insert(AllEggNames, name)
-        end
-    end
-end
-
-EggFilterTab:newDropdown(
-    "🥚 SELECT EGGS TO STEAL",
-    "Pick eggs one at a time. Each pick is added to the filter.",
-    AllEggNames,
-    function(Choice)
-        Config.EggFilter[Choice] = true
-    end
-)
-
 EggFilterTab:newButton(
     "✅ SELECT ALL EGGS",
-    "Turn on every egg in the filter list.",
+    "Turn on every egg in the catalog.",
     function()
-        for _, name in ipairs(AllEggNames) do
-            Config.EggFilter[name] = true
+        for _, rarity in ipairs(RarityRenderOrder) do
+            for _, name in ipairs(EggCatalog[rarity]) do
+                Config.EggFilter[name] = true
+            end
         end
     end
 )
 
 EggFilterTab:newButton(
     "🧹 CLEAR ALL EGGS",
-    "Turn off every egg in the filter list.",
+    "Remove every egg from the filter.",
     function()
         Config.EggFilter = {}
     end
 )
 
-EggFilterTab:newButton(
-    "🗑️ REMOVE ONE EGG",
-    "Clears the selected egg from the filter.",
-    function() end
-)
+-- One dropdown per rarity
+for _, rarity in ipairs(RarityRenderOrder) do
+    local eggList = EggCatalog[rarity]
+    if eggList then
+        EggFilterTab:newButton(
+            "─── " .. rarity .. " ───",
+            "",
+            function() end
+        )
 
--- Second dropdown acts as "remove one"
-EggFilterTab:newDropdown(
-    "🗑️ REMOVE AN EGG FROM FILTER",
-    "Pick an egg to remove from the active filter.",
-    AllEggNames,
-    function(Choice)
-        Config.EggFilter[Choice] = nil
+        EggFilterTab:newDropdown(
+            "🥚 ADD " .. string.upper(rarity) .. " EGG",
+            "Pick any " .. rarity .. " egg to add to the filter.",
+            eggList,
+            function(Choice)
+                Config.EggFilter[Choice] = true
+            end
+        )
+
+        EggFilterTab:newDropdown(
+            "🗑️ REMOVE " .. string.upper(rarity) .. " EGG",
+            "Pick any " .. rarity .. " egg to remove from the filter.",
+            eggList,
+            function(Choice)
+                Config.EggFilter[Choice] = nil
+            end
+        )
     end
-)
+end
 
 --============================================================
 -- 22. POINT TAB
@@ -800,6 +814,16 @@ SettingsTab:newSlider(
     600,
     function(Value)
         Config.Speed = math.clamp(tonumber(Value) or 300, 40, 600)
+    end
+)
+
+SettingsTab:newSlider(
+    "⏱️ TELEPORT COOLDOWN (ms)",
+    "Delay between teleports. Higher = safer. (0 – 1000 ms)",
+    350,
+    1000,
+    function(Value)
+        Config.TeleCooldown = math.clamp(tonumber(Value) or 350, 0, 1000) / 1000
     end
 )
 
