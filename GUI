@@ -1,8 +1,6 @@
--- SARAP UI v4.4 (MOBILE FRIENDLY + TOGGLE SETTERS + DROPDOWN FIX)
+-- SARAP UI v4.5 (MULTI-SELECT DROPDOWN)
 -- Floating reopen button = "ZH"
--- Adds: Close UI card + Delete Script card
--- newToggle / newSlider return (card, setterFunction)
--- Fixed: dropdown now auto-resizes card and doesn't overlap other cards
+-- Adds: Close UI + Delete Script + newMultiDropdown
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Players          = game:GetService("Players")
@@ -38,6 +36,7 @@ local T = {
     Input   = Color3.fromRGB(34, 34, 42),
     InputF  = Color3.fromRGB(44, 44, 54),
     Danger  = Color3.fromRGB(190, 70, 70),
+    Green   = Color3.fromRGB(80, 190, 100),
     Font    = Enum.Font.Gotham,
     Bold    = Enum.Font.GothamBold,
 }
@@ -75,7 +74,6 @@ function VBHUB:Load(title, subtitle)
     self.Connections = {}
 
     local vp = getViewport()
-
     local WIN_W, WIN_H, SIDEBAR_W
 
     if isMobile then
@@ -106,7 +104,6 @@ function VBHUB:Load(title, subtitle)
     stroke(main, T.Border, 1)
     self.Main = main
 
-    -- HEADER
     local header = new("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
         BackgroundColor3 = T.Panel,
@@ -142,7 +139,6 @@ function VBHUB:Load(title, subtitle)
     })
     corner(headerClose, 8)
 
-    -- SIDEBAR
     local sidebar = new("Frame", {
         Size = UDim2.new(0, SIDEBAR_W, 1, -40),
         Position = UDim2.new(0, 0, 0, 40),
@@ -163,7 +159,6 @@ function VBHUB:Load(title, subtitle)
     })
     self.Content = content
 
-    -- DRAG
     local drag, ds, sp
     table.insert(self.Connections, header.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1
@@ -187,7 +182,6 @@ function VBHUB:Load(title, subtitle)
         end
     end))
 
-    -- FLOATING ZH BUTTON
     local floating = new("TextButton", {
         Name = "VBHUB_Floating",
         Size = UDim2.new(0, 56, 0, 56),
@@ -379,6 +373,11 @@ function VBHUB:newTab(name)
     end
     tab.newDropdown = function(_, l, d, o, cb)
         local r = lib:_dropdown(page, l, d, o, cb); refreshCanvas(); return r
+    end
+    tab.newMultiDropdown = function(_, l, d, o, cb, selected)
+        local r, api = lib:_multiDropdown(page, l, d, o, cb, selected)
+        refreshCanvas()
+        return r, api
     end
 
     return tab
@@ -619,10 +618,6 @@ function VBHUB:_slider(page, label, desc, def, pc, cb)
     end
 end
 
---============================================================
--- DROPDOWN (fixed auto-resize)
---============================================================
-
 function VBHUB:_dropdown(page, label, desc, options, cb)
     if type(desc) == "table" and options == nil then
         options = desc; desc = ""; cb = nil
@@ -631,7 +626,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     if type(options) ~= "table" then options = {} end
     if type(label) ~= "string" then label = tostring(label) end
 
-    -- Compact mode when there's no description
     local hasDesc = (#desc > 0)
     local baseH   = hasDesc and 74 or 52
     local rowH    = 26
@@ -641,7 +635,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     local c = card(page, baseH)
     local open = false
 
-    -- Title
     new("TextLabel", {
         Size = UDim2.new(1, -20, 0, 16),
         Position = UDim2.new(0, 10, 0, 8),
@@ -650,7 +643,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
         TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
     })
 
-    -- Description (only if present)
     if hasDesc then
         new("TextLabel", {
             Size = UDim2.new(1, -20, 0, 32),
@@ -665,7 +657,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
 
     local selectY = hasDesc and 52 or 26
 
-    -- Select button
     local sb = new("TextButton", {
         Size = UDim2.new(1, -20, 0, 26),
         Position = UDim2.new(0, 10, 0, selectY),
@@ -676,7 +667,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     })
     corner(sb, 6)
 
-    -- Hidden options list (rendered inside the same card)
     local pp = new("ScrollingFrame", {
         Size = UDim2.new(1, -20, 0, listH),
         Position = UDim2.new(0, 10, 0, selectY + 30),
@@ -688,7 +678,6 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
         ScrollBarImageColor3 = T.Accent,
         ScrollBarImageTransparency = 0.5,
         CanvasSize = UDim2.new(0, 0, 0, listH),
-        AutomaticCanvasSize = Enum.AutomaticSize.None,
     })
     corner(pp, 6)
     stroke(pp, T.Border, 1)
@@ -741,6 +730,244 @@ function VBHUB:_dropdown(page, label, desc, options, cb)
     end)
 
     return c
+end
+
+--============================================================
+-- MULTI-SELECT DROPDOWN
+-- Returns (card, api) where api = { set(name, bool), get(name), clear() }
+--============================================================
+
+function VBHUB:_multiDropdown(page, label, desc, options, cb, initialSelected)
+    if type(desc) == "table" and options == nil then
+        options = desc; desc = ""; cb = nil
+    end
+    if type(desc) ~= "string" then desc = "" end
+    if type(options) ~= "table" then options = {} end
+    if type(label) ~= "string" then label = tostring(label) end
+    if type(initialSelected) ~= "table" then initialSelected = {} end
+
+    local selected = {}
+    for _, k in ipairs(initialSelected) do selected[k] = true end
+
+    local hasDesc = (#desc > 0)
+    local baseH   = hasDesc and 86 or 64
+    local rowH    = 30
+    local listPad = 12
+    local listH   = #options * rowH + listPad + 36  -- +36 for "DONE" button row
+
+    local c = card(page, baseH)
+    local open = false
+
+    new("TextLabel", {
+        Size = UDim2.new(1, -20, 0, 16),
+        Position = UDim2.new(0, 10, 0, 8),
+        BackgroundTransparency = 1, Text = label,
+        TextColor3 = T.Text, Font = T.Bold, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = c,
+    })
+
+    if hasDesc then
+        new("TextLabel", {
+            Size = UDim2.new(1, -20, 0, 32),
+            Position = UDim2.new(0, 10, 0, 24),
+            BackgroundTransparency = 1, Text = desc,
+            TextColor3 = T.Dim, Font = T.Font, TextSize = 10,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top, Parent = c,
+        })
+    end
+
+    local selectY = hasDesc and 52 or 26
+
+    -- Header button (acts as "open / close")
+    local sb = new("TextButton", {
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, selectY),
+        BackgroundColor3 = T.Input, BorderSizePixel = 0,
+        Text = "Pick eggs...", TextColor3 = T.Text,
+        Font = T.Font, TextSize = 12,
+        AutoButtonColor = false, Parent = c,
+    })
+    corner(sb, 6)
+
+    -- Selected count badge on the right
+    local badge = new("TextLabel", {
+        Size = UDim2.new(0, 80, 1, 0), Position = UDim2.new(1, -84, 0, 0),
+        BackgroundTransparency = 1, Text = "",
+        TextColor3 = T.Accent, Font = T.Bold, TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Right, Parent = sb,
+    })
+
+    -- Options popup
+    local pp = new("ScrollingFrame", {
+        Size = UDim2.new(1, -20, 0, listH),
+        Position = UDim2.new(0, 10, 0, selectY + 34),
+        BackgroundColor3 = T.PanelHi,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 5, Parent = c,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = T.Accent,
+        ScrollBarImageTransparency = 0.5,
+        CanvasSize = UDim2.new(0, 0, 0, listH),
+    })
+    corner(pp, 6)
+    stroke(pp, T.Border, 1)
+
+    new("UIListLayout", {
+        Padding = UDim.new(0, 2),
+        SortOrder = Enum.SortOrder.LayoutOrder, Parent = pp,
+    })
+    new("UIPadding", {
+        PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+        PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), Parent = pp,
+    })
+
+    local rowRefs = {}
+
+    local function updateBadge()
+        local count = 0
+        for _ in pairs(selected) do count = count + 1 end
+        if count == 0 then
+            badge.Text = ""
+        else
+            badge.Text = "✓ " .. count .. " selected"
+        end
+    end
+
+    local function setRowVisual(name)
+        local row = rowRefs[name]
+        if not row then return end
+        if selected[name] then
+            row.check.BackgroundColor3 = T.Green
+            row.check.Text = "✓"
+            row.label.TextColor3 = T.Text
+        else
+            row.check.BackgroundColor3 = T.Off
+            row.check.Text = ""
+            row.label.TextColor3 = T.Dim
+        end
+    end
+
+    local function toggle(name, fire)
+        selected[name] = not selected[name] or nil
+        setRowVisual(name)
+        updateBadge()
+        if fire and cb then cb(name, selected[name] == true) end
+    end
+
+    for i, o in ipairs(options) do
+        local row = new("TextButton", {
+            Size = UDim2.new(1, 0, 0, rowH - 2),
+            BackgroundColor3 = T.PanelHi, BackgroundTransparency = 1,
+            BorderSizePixel = 0, Text = "",
+            AutoButtonColor = false, LayoutOrder = i, Parent = pp,
+        })
+
+        local check = new("TextButton", {
+            Size = UDim2.new(0, 22, 0, 22),
+            Position = UDim2.new(0, 2, 0.5, -11),
+            BackgroundColor3 = T.Off,
+            BorderSizePixel = 0, Text = "", TextColor3 = T.Text,
+            Font = T.Bold, TextSize = 13,
+            AutoButtonColor = false, Parent = row,
+        })
+        corner(check, 6)
+
+        local lbl = new("TextLabel", {
+            Size = UDim2.new(1, -34, 1, 0),
+            Position = UDim2.new(0, 30, 0, 0),
+            BackgroundTransparency = 1, Text = tostring(o),
+            TextColor3 = T.Dim, Font = T.Font, TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left, Parent = row,
+        })
+
+        rowRefs[o] = { check = check, label = lbl }
+
+        row.MouseEnter:Connect(function()
+            tw(row, 0.1, { BackgroundTransparency = 0, BackgroundColor3 = T.Panel })
+        end)
+        row.MouseLeave:Connect(function()
+            tw(row, 0.1, { BackgroundTransparency = 1 })
+        end)
+
+        local function click()
+            toggle(o, true)
+        end
+        row.MouseButton1Click:Connect(click)
+        check.MouseButton1Click:Connect(click)
+    end
+
+    -- DONE button at the bottom of the popup
+    local done = new("TextButton", {
+        Size = UDim2.new(1, -8, 0, 26),
+        Position = UDim2.new(0, 4, 1, -30),
+        BackgroundColor3 = T.Accent, BorderSizePixel = 0,
+        Text = "DONE", TextColor3 = Color3.fromRGB(255,255,255),
+        Font = T.Bold, TextSize = 11,
+        AutoButtonColor = false, Parent = pp, ZIndex = 6,
+        LayoutOrder = #options + 1,
+    })
+    corner(done, 6)
+    done.MouseButton1Click:Connect(function()
+        open = false
+        pp.Visible = false
+        c.Size = UDim2.new(1, 0, 0, baseH)
+    end)
+
+    local function openIt()
+        open = true
+        pp.Visible = true
+        c.Size = UDim2.new(1, 0, 0, baseH + listH + 6)
+    end
+    local function close()
+        open = false
+        pp.Visible = false
+        c.Size = UDim2.new(1, 0, 0, baseH)
+    end
+
+    sb.MouseButton1Click:Connect(function()
+        if open then close() else openIt() end
+    end)
+
+    updateBadge()
+    for name in pairs(selected) do setRowVisual(name) end
+
+    local api = {
+        set = function(name, value)
+            if value then
+                selected[name] = true
+            else
+                selected[name] = nil
+            end
+            setRowVisual(name)
+            updateBadge()
+            if cb then cb(name, value and true or false) end
+        end,
+        get = function(name) return selected[name] == true end,
+        clear = function()
+            for name in pairs(selected) do
+                selected[name] = nil
+                setRowVisual(name)
+            end
+            updateBadge()
+        end,
+        selectAll = function()
+            for _, name in ipairs(options) do
+                selected[name] = true
+                setRowVisual(name)
+            end
+            updateBadge()
+        end,
+        list = function()
+            local out = {}
+            for k in pairs(selected) do table.insert(out, k) end
+            return out
+        end,
+    }
+
+    return c, api
 end
 
 function VBHUB:AddCloseButton(tab, label, desc)
