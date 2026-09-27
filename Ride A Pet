@@ -1,7 +1,7 @@
 --============================================================
--- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.0)
+-- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.2)
 -- AUTO STEAL + FLY/TELEPORT MODE
--- EGG ESP + SAVE POINT
+-- EGG FILTER + EGG ESP + SAVE POINT
 -- MOBILE SUPPORTED • NO KEY
 --============================================================
 
@@ -45,16 +45,70 @@ end
 local Config = {
     AutoSteal  = false,
     StealMode  = "Teleport",       -- "Teleport" | "Fly"
-    Priority   = "Highest Luck",   -- "Highest Luck" | "Rarest"
     Speed      = 300,
     EggESP     = false,
     SavedPoint = nil,
     Stop       = false,
     Busy       = false,
+    UseFilter  = false,            -- if true, only target eggs in EggFilter
+    EggFilter  = {},               -- [EggName] = true
 }
 
 --============================================================
--- 5. GAME OBJECTS
+-- 5. EGG CATALOG (grouped by rarity) — UPDATED
+--============================================================
+
+local EggCatalog = {
+    Common = {
+        "White Egg",
+        "Brown Egg",
+    },
+    Rare = {
+        "Cracked Egg",
+        "Easter Egg",
+        "Striped Egg",
+        "Stone Egg",
+        "Leaf Egg",
+    },
+    Epic = {
+        "Mushroom Egg",
+        "Flower Egg",
+        "Lotus Egg",
+        "Slime Egg",
+        "Ice Egg",
+    },
+    Legendary = {
+        "Glass Egg",
+        "Golden Egg",
+    },
+    Mythic = {
+        "Crystal Egg",
+        "Skull Egg",
+        "Dominus Egg",
+        "Flaming Egg",
+        "Sinister Egg",
+        "Soul Egg",
+        "Dark Egg",
+    },
+    Divine = {
+        "Aurora Egg",
+        "Galaxy Egg",
+    },
+    Ethereal = {
+        "Blackhole Egg",
+        "Cherub Egg",
+        "Solaris Egg",
+        "Volcanic Egg",
+    },
+}
+
+local RarityOrder = {
+    Common = 1, Rare = 2, Epic = 3, Legendary = 4,
+    Mythic = 5, Divine = 6, Ethereal = 7,
+}
+
+--============================================================
+-- 6. GAME OBJECTS
 --============================================================
 
 local GameRemotes = nil
@@ -82,7 +136,7 @@ pcall(function()
 end)
 
 --============================================================
--- 6. CHARACTER
+-- 7. CHARACTER
 --============================================================
 
 local function GetCharacter()
@@ -97,15 +151,6 @@ local function GetCharacter()
 
     return Character, Humanoid, Root
 end
-
---============================================================
--- 7. EGG RARITY
---============================================================
-
-local RarityOrder = {
-    Common = 1, Rare = 2, Epic = 3, Legendary = 4,
-    Mythic = 5, Divine = 6, Ethereal = 7,
-}
 
 --============================================================
 -- 8. EGG INFO
@@ -134,7 +179,7 @@ local function GetEggInfo(Egg)
 end
 
 --============================================================
--- 9. FIND BEST EGG
+-- 9. FIND BEST EGG (respects EggFilter when enabled)
 --============================================================
 
 local function FindBestEgg()
@@ -151,25 +196,35 @@ local function FindBestEgg()
         local Position = Egg:GetAttribute("Position")
 
         if EggName and typeof(Position) == "Vector3" then
-            local Distance = (Root.Position - Position).Magnitude
-            local Score
 
-            if Config.Priority == "Highest Luck" then
-                Score = Luck * 100000 - Distance
-            else
-                local RarityValue = RarityOrder[Rarity] or 1
-                Score = RarityValue * 100000 + Luck * 1000 - Distance
+            local PassFilter = true
+            if Config.UseFilter then
+                if not Config.EggFilter[EggName] then
+                    PassFilter = false
+                end
             end
 
-            if Score > BestScore then
-                BestScore = Score
-                BestEgg = {
-                    Object   = Egg,
-                    Name     = EggName,
-                    Luck     = Luck,
-                    Rarity   = Rarity,
-                    Position = Position,
-                }
+            if PassFilter then
+                local Distance = (Root.Position - Position).Magnitude
+                local Score
+
+                if Config.UseFilter then
+                    Score = -Distance
+                else
+                    local RarityValue = RarityOrder[Rarity] or 1
+                    Score = RarityValue * 100000 + Luck * 1000 - Distance
+                end
+
+                if Score > BestScore then
+                    BestScore = Score
+                    BestEgg = {
+                        Object   = Egg,
+                        Name     = EggName,
+                        Luck     = Luck,
+                        Rarity   = Rarity,
+                        Position = Position,
+                    }
+                end
             end
         end
     end
@@ -522,12 +577,13 @@ task.spawn(function()
 end)
 
 --============================================================
--- 19. BUILD UI (SARAP UI v4.0)
+-- 19. BUILD UI (SARAP UI v4.2)
 --============================================================
 
 local Hub = VBHUB:Load("ZENNY HUB", "RIDE A PET • ENGLISH")
 
 local MainTab     = Hub:newTab("Auto Steal")
+local EggFilterTab= Hub:newTab("Egg Filter")
 local PointTab    = Hub:newTab("Point")
 local ESPTab      = Hub:newTab("Egg ESP")
 local SettingsTab = Hub:newTab("Settings")
@@ -569,14 +625,6 @@ MainTab:newButton(
 )
 
 MainTab:newButton(
-    "📌 CURRENT MODE",
-    "Print the current steal mode to console.",
-    function()
-        -- intentionally blank (prints removed)
-    end
-)
-
-MainTab:newButton(
     "🛑 STOP AUTO STEAL",
     "Stop auto steal and reset movement.",
     function()
@@ -586,24 +634,75 @@ MainTab:newButton(
     end
 )
 
-MainTab:newButton(
-    "🍀 PRIORITY: HIGHEST LUCK",
-    "Target eggs with the highest Luck value.",
-    function()
-        Config.Priority = "Highest Luck"
+--============================================================
+-- 21. EGG FILTER TAB
+--============================================================
+
+EggFilterTab:newToggle(
+    "🎯 USE EGG FILTER",
+    "When ON, Auto Steal only targets eggs you enabled below.",
+    false,
+    function(State)
+        Config.UseFilter = State
     end
 )
 
-MainTab:newButton(
-    "💎 PRIORITY: RAREST EGG",
-    "Target eggs with the rarest tier.",
+-- Store toggle setter handles so Select All / Clear All can update visuals
+local FilterToggles = {}
+
+EggFilterTab:newButton(
+    "✅ SELECT ALL EGGS",
+    "Turn on every egg in the filter list.",
     function()
-        Config.Priority = "Rarest"
+        for _, list in pairs(EggCatalog) do
+            for _, name in ipairs(list) do
+                Config.EggFilter[name] = true
+            end
+        end
+        for name, setter in pairs(FilterToggles) do
+            if setter then setter(true) end
+        end
     end
 )
+
+EggFilterTab:newButton(
+    "🧹 CLEAR ALL EGGS",
+    "Turn off every egg in the filter list.",
+    function()
+        Config.EggFilter = {}
+        for name, setter in pairs(FilterToggles) do
+            if setter then setter(false) end
+        end
+    end
+)
+
+-- Build the egg toggles per rarity
+for rarity, eggList in pairs(EggCatalog) do
+    EggFilterTab:newButton(
+        "─── " .. rarity .. " ───",
+        "",
+        function() end
+    )
+
+    for _, eggName in ipairs(eggList) do
+        local capturedName = eggName
+
+        local setter = EggFilterTab:newToggle(
+            "  " .. eggName,
+            "",
+            false,
+            function(State)
+                Config.EggFilter[capturedName] = State or nil
+            end
+        )
+
+        -- The GUI library returns a setter via the toggle. If not, setter stays nil.
+        FilterToggles[capturedName] = setter
+    end
+end
 
 --============================================================
--- 21. POINT TAB
+-- 22. POINT TAB
 --============================================================
 
 PointTab:newButton(
@@ -638,7 +737,7 @@ PointTab:newButton(
 )
 
 --============================================================
--- 22. EGG ESP TAB
+-- 23. EGG ESP TAB
 --============================================================
 
 ESPTab:newToggle(
@@ -664,7 +763,7 @@ ESPTab:newButton(
 )
 
 --============================================================
--- 23. SETTINGS TAB
+-- 24. SETTINGS TAB
 --============================================================
 
 SettingsTab:newSlider(
@@ -677,7 +776,6 @@ SettingsTab:newSlider(
     end
 )
 
--- Close / Delete cards
 Hub:AddCloseButton(
     SettingsTab,
     "🛑 CLOSE UI",
@@ -691,7 +789,7 @@ Hub:AddDeleteButton(
 )
 
 --============================================================
--- 24. ACTIVE EGG EVENTS
+-- 25. ACTIVE EGG EVENTS
 --============================================================
 
 if ActiveEggs then
@@ -708,7 +806,7 @@ if ActiveEggs then
 end
 
 --============================================================
--- 25. RESPAWN
+-- 26. RESPAWN
 --============================================================
 
 Player.CharacterAdded:Connect(function()
