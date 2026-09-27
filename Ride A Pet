@@ -1,7 +1,7 @@
 --============================================================
--- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.4)
+-- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.5)
 -- AUTO STEAL + FLY/TELEPORT MODE
--- EGG FILTER (PER RARITY) + EGG ESP + SAVE POINT
+-- MULTI-SELECT EGG FILTER + EGG ESP + SAVE POINT
 -- MOBILE SUPPORTED • NO KEY
 --============================================================
 
@@ -43,64 +43,44 @@ end
 --============================================================
 
 local Config = {
-    AutoSteal   = false,
-    StealMode   = "Teleport",      -- "Teleport" | "Fly"
-    Speed       = 300,
-    TeleCooldown = 0.35,           -- seconds between teleports (fixes "didn't teleport back")
-    EggESP      = false,
-    SavedPoint  = nil,
-    Stop        = false,
-    Busy        = false,
-    UseFilter   = false,
-    EggFilter   = {},
+    AutoSteal    = false,
+    StealMode    = "Teleport",
+    Speed        = 300,
+    TeleCooldown = 0.35,
+    EggESP       = false,
+    SavedPoint   = nil,
+    Stop         = false,
+    Busy         = false,
+    UseFilter    = false,
+    EggFilter    = {},
 }
 
 --============================================================
--- 5. EGG CATALOG (highest → lowest)
+-- 5. EGG CATALOG
 --============================================================
 
 local EggCatalog = {
     Ethereal = {
-        "Volcanic Egg",
-        "Solaris Egg",
-        "Cherub Egg",
-        "Blackhole Egg",
+        "Volcanic Egg", "Solaris Egg", "Cherub Egg", "Blackhole Egg",
     },
     Divine = {
-        "Bloom Egg",
-        "Galaxy Egg",
-        "Aurora Egg",
+        "Bloom Egg", "Galaxy Egg", "Aurora Egg",
     },
     Mythic = {
-        "Dark Egg",
-        "Soul Egg",
-        "Sinister Egg",
-        "Flaming Egg",
-        "Dominus Egg",
-        "Skull Egg",
-        "Crystal Egg",
+        "Dark Egg", "Soul Egg", "Sinister Egg", "Flaming Egg",
+        "Dominus Egg", "Skull Egg", "Crystal Egg",
     },
     Legendary = {
-        "Golden Egg",
-        "Glass Egg",
+        "Golden Egg", "Glass Egg",
     },
     Epic = {
-        "Ice Egg",
-        "Slime Egg",
-        "Lotus Egg",
-        "Flower Egg",
-        "Mushroom Egg",
+        "Ice Egg", "Slime Egg", "Lotus Egg", "Flower Egg", "Mushroom Egg",
     },
     Rare = {
-        "Leaf Egg",
-        "Stone Egg",
-        "Striped Egg",
-        "Easter Egg",
-        "Cracked Egg",
+        "Leaf Egg", "Stone Egg", "Striped Egg", "Easter Egg", "Cracked Egg",
     },
     Common = {
-        "Brown Egg",
-        "White Egg",
+        "Brown Egg", "White Egg",
     },
 }
 
@@ -124,21 +104,15 @@ local EggsModule  = nil
 
 pcall(function()
     local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if Remotes then
-        GameRemotes = Remotes:FindFirstChild("Game")
-    end
+    if Remotes then GameRemotes = Remotes:FindFirstChild("Game") end
 
     local ServerData = ReplicatedStorage:FindFirstChild("ServerData")
-    if ServerData then
-        ActiveEggs = ServerData:FindFirstChild("ActiveEggs")
-    end
+    if ServerData then ActiveEggs = ServerData:FindFirstChild("ActiveEggs") end
 
     local GameData = ReplicatedStorage:FindFirstChild("GameData")
     if GameData then
         local Eggs = GameData:FindFirstChild("Eggs")
-        if Eggs then
-            EggsModule = require(Eggs)
-        end
+        if Eggs then EggsModule = require(Eggs) end
     end
 end)
 
@@ -203,7 +177,6 @@ local function FindBestEgg()
         local Position = Egg:GetAttribute("Position")
 
         if EggName and typeof(Position) == "Vector3" then
-
             local PassFilter = true
             if Config.UseFilter then
                 if not Config.EggFilter[EggName] then
@@ -247,19 +220,16 @@ local CurrentTween = nil
 
 local function StopMovement()
     Config.Stop = true
-
     if CurrentTween then
         pcall(function() CurrentTween:Cancel() end)
         CurrentTween = nil
     end
 
     local _, Humanoid, Root = GetCharacter()
-
     if Root then
         Root.AssemblyLinearVelocity  = Vector3.zero
         Root.AssemblyAngularVelocity = Vector3.zero
     end
-
     if Humanoid then
         Humanoid.PlatformStand = false
         Humanoid.AutoRotate    = true
@@ -277,10 +247,7 @@ local function FlyTo(Position)
     if not Root then return false end
 
     Config.Stop = false
-
-    if CurrentTween then
-        pcall(function() CurrentTween:Cancel() end)
-    end
+    if CurrentTween then pcall(function() CurrentTween:Cancel() end) end
 
     local Distance = (Root.Position - Position).Magnitude
     if Distance <= 3 then return true end
@@ -304,7 +271,6 @@ local function FlyTo(Position)
         TweenInfo.new(Duration, Enum.EasingStyle.Linear),
         { CFrame = CFrame.new(Position) * Root.CFrame.Rotation }
     )
-
     CurrentTween:Play()
 
     while CurrentTween and CurrentTween.PlaybackState == Enum.PlaybackState.Playing do
@@ -320,14 +286,11 @@ local function FlyTo(Position)
     CurrentTween = nil
 
     for Part, Value in pairs(OldCollision) do
-        if Part and Part.Parent then
-            Part.CanCollide = Value
-        end
+        if Part and Part.Parent then Part.CanCollide = Value end
     end
 
     Humanoid.PlatformStand = false
     Humanoid.AutoRotate    = true
-
     Root.AssemblyLinearVelocity  = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
 
@@ -335,13 +298,12 @@ local function FlyTo(Position)
 end
 
 --============================================================
--- 12. TELEPORT (with safety checks)
+-- 12. TELEPORT (with cooldown)
 --============================================================
 
 local lastTeleport = 0
 
 local function TeleportTo(Position)
-    -- cooldown guard: prevents overlapping teleports that would cause a "didn't teleport back" glitch
     local now = os.clock()
     if now - lastTeleport < Config.TeleCooldown then
         task.wait(Config.TeleCooldown - (now - lastTeleport))
@@ -353,14 +315,11 @@ local function TeleportTo(Position)
     Root.AssemblyLinearVelocity  = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
 
-    -- use CFrame with rotation reset to avoid weird face-planting
     Root.CFrame = CFrame.new(Position) * Root.CFrame.Rotation
     lastTeleport = os.clock()
 
-    -- let the server catch up
     task.wait(0.1)
 
-    -- verify
     local _, _, NewRoot = GetCharacter()
     if not NewRoot then return false end
 
@@ -382,7 +341,6 @@ local function GetPlotPosition()
             if Owner then
                 local Mine = false
                 pcall(function() Mine = Owner.Value == Player end)
-
                 if Mine then
                     local Base = Plot:FindFirstChild("Baseplate")
                     if Base and Base:IsA("BasePart") then
@@ -392,7 +350,6 @@ local function GetPlotPosition()
             end
         end
     end
-
     return nil
 end
 
@@ -401,9 +358,7 @@ end
 --============================================================
 
 local function GetReturnPosition()
-    if Config.SavedPoint then
-        return Config.SavedPoint.Position
-    end
+    if Config.SavedPoint then return Config.SavedPoint.Position end
     return GetPlotPosition()
 end
 
@@ -439,20 +394,16 @@ local function PickupEgg(Egg)
         if GetBasketCount() > Before then return true end
         task.wait(0.05)
     end
-
     return false
 end
 
 --============================================================
--- 16. RETURN (respects mode)
+-- 16. RETURN HOME
 --============================================================
 
 local function ReturnHome()
     local Target = GetReturnPosition()
-    if not Target then
-        return false
-    end
-
+    if not Target then return false end
     if Config.StealMode == "Teleport" then
         return TeleportTo(Target)
     else
@@ -461,7 +412,7 @@ local function ReturnHome()
 end
 
 --============================================================
--- 17. AUTO STEAL LOOP (with safety cooldowns)
+-- 17. AUTO STEAL LOOP
 --============================================================
 
 local function AutoStealLoop()
@@ -490,7 +441,6 @@ local function AutoStealLoop()
 
             if not Reached then task.wait(0.3); continue end
 
-            -- small settle delay before pickup attempt
             task.wait(0.1)
 
             local Picked = false
@@ -502,17 +452,14 @@ local function AutoStealLoop()
             end
 
             if Picked then
-                -- small wait for server to register basket change
                 task.wait(0.15)
                 ReturnHome()
             else
                 task.wait(0.3)
             end
 
-            -- final cooldown before next cycle
             task.wait(0.2)
         end
-
         Config.Busy = false
     end)
 end
@@ -590,23 +537,17 @@ local function UpdateESP()
     end
 
     for Egg in pairs(ESPObjects) do
-        if not Existing[Egg] or not Egg.Parent then
-            RemoveESP(Egg)
-        end
+        if not Existing[Egg] or not Egg.Parent then RemoveESP(Egg) end
     end
 end
 
 local function ClearESP()
-    for Egg in pairs(ESPObjects) do
-        RemoveESP(Egg)
-    end
+    for Egg in pairs(ESPObjects) do RemoveESP(Egg) end
 end
 
 task.spawn(function()
     while task.wait(0.2) do
-        if Config.EggESP then
-            pcall(UpdateESP)
-        end
+        if Config.EggESP then pcall(UpdateESP) end
     end
 end)
 
@@ -645,17 +586,13 @@ MainTab:newToggle(
 MainTab:newButton(
     "⚡ TELEPORT MODE",
     "Teleport → Egg → Teleport Back",
-    function()
-        Config.StealMode = "Teleport"
-    end
+    function() Config.StealMode = "Teleport" end
 )
 
 MainTab:newButton(
     "✈️ FLY MODE",
     "Fly → Egg → Fly Back",
-    function()
-        Config.StealMode = "Fly"
-    end
+    function() Config.StealMode = "Fly" end
 )
 
 MainTab:newButton(
@@ -669,28 +606,14 @@ MainTab:newButton(
 )
 
 --============================================================
--- 21. EGG FILTER TAB (per-rarity dropdowns)
+-- 21. EGG FILTER TAB (multi-select per rarity)
 --============================================================
 
 EggFilterTab:newToggle(
     "🎯 USE EGG FILTER",
     "When ON, Auto Steal only targets eggs you've picked below.",
     false,
-    function(State)
-        Config.UseFilter = State
-    end
-)
-
-EggFilterTab:newButton(
-    "✅ SELECT ALL EGGS",
-    "Turn on every egg in the catalog.",
-    function()
-        for _, rarity in ipairs(RarityRenderOrder) do
-            for _, name in ipairs(EggCatalog[rarity]) do
-                Config.EggFilter[name] = true
-            end
-        end
-    end
+    function(State) Config.UseFilter = State end
 )
 
 EggFilterTab:newButton(
@@ -698,10 +621,14 @@ EggFilterTab:newButton(
     "Remove every egg from the filter.",
     function()
         Config.EggFilter = {}
+        for _, api in pairs(MultiDropdownAPIs) do
+            if api then api.clear() end
+        end
     end
 )
 
--- One dropdown per rarity
+local MultiDropdownAPIs = {}
+
 for _, rarity in ipairs(RarityRenderOrder) do
     local eggList = EggCatalog[rarity]
     if eggList then
@@ -711,23 +638,20 @@ for _, rarity in ipairs(RarityRenderOrder) do
             function() end
         )
 
-        EggFilterTab:newDropdown(
-            "🥚 ADD " .. string.upper(rarity) .. " EGG",
-            "Pick any " .. rarity .. " egg to add to the filter.",
+        local _, api = EggFilterTab:newMultiDropdown(
+            "🥚 " .. string.upper(rarity) .. " EGGS",
+            "Tap to open. Tick any number of " .. rarity .. " eggs.",
             eggList,
-            function(Choice)
-                Config.EggFilter[Choice] = true
+            function(eggName, isOn)
+                if isOn then
+                    Config.EggFilter[eggName] = true
+                else
+                    Config.EggFilter[eggName] = nil
+                end
             end
         )
 
-        EggFilterTab:newDropdown(
-            "🗑️ REMOVE " .. string.upper(rarity) .. " EGG",
-            "Pick any " .. rarity .. " egg to remove from the filter.",
-            eggList,
-            function(Choice)
-                Config.EggFilter[Choice] = nil
-            end
-        )
+        MultiDropdownAPIs[rarity] = api
     end
 end
 
@@ -749,12 +673,8 @@ PointTab:newButton(
     "✈️ FLY TO POINT",
     "Fly back to your saved point.",
     function()
-        if not Config.SavedPoint then
-            return
-        end
-        task.spawn(function()
-            FlyTo(Config.SavedPoint.Position)
-        end)
+        if not Config.SavedPoint then return end
+        task.spawn(function() FlyTo(Config.SavedPoint.Position) end)
     end
 )
 
@@ -762,9 +682,7 @@ PointTab:newButton(
     "⚡ TELEPORT TO POINT",
     "Instantly teleport to your saved point.",
     function()
-        if not Config.SavedPoint then
-            return
-        end
+        if not Config.SavedPoint then return end
         TeleportTo(Config.SavedPoint.Position)
     end
 )
@@ -772,9 +690,7 @@ PointTab:newButton(
 PointTab:newButton(
     "🧹 CLEAR POINT",
     "Delete the saved point.",
-    function()
-        Config.SavedPoint = nil
-    end
+    function() Config.SavedPoint = nil end
 )
 
 --============================================================
@@ -787,20 +703,14 @@ ESPTab:newToggle(
     false,
     function(State)
         Config.EggESP = State
-        if State then
-            UpdateESP()
-        else
-            ClearESP()
-        end
+        if State then UpdateESP() else ClearESP() end
     end
 )
 
 ESPTab:newButton(
     "🧹 CLEAR EGG ESP",
     "Remove all ESP labels.",
-    function()
-        ClearESP()
-    end
+    function() ClearESP() end
 )
 
 --============================================================
@@ -810,8 +720,7 @@ ESPTab:newButton(
 SettingsTab:newSlider(
     "⚡ FLY SPEED",
     "Speed used while flying to eggs (40 – 600).",
-    300,
-    600,
+    300, 600,
     function(Value)
         Config.Speed = math.clamp(tonumber(Value) or 300, 40, 600)
     end
@@ -820,8 +729,7 @@ SettingsTab:newSlider(
 SettingsTab:newSlider(
     "⏱️ TELEPORT COOLDOWN (ms)",
     "Delay between teleports. Higher = safer. (0 – 1000 ms)",
-    350,
-    1000,
+    350, 1000,
     function(Value)
         Config.TeleCooldown = math.clamp(tonumber(Value) or 350, 0, 1000) / 1000
     end
@@ -850,10 +758,7 @@ if ActiveEggs then
             pcall(function() CreateESP(Egg) end)
         end
     end)
-
-    ActiveEggs.ChildRemoved:Connect(function(Egg)
-        RemoveESP(Egg)
-    end)
+    ActiveEggs.ChildRemoved:Connect(function(Egg) RemoveESP(Egg) end)
 end
 
 --============================================================
