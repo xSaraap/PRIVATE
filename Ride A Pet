@@ -1,7 +1,7 @@
 --============================================================
 -- ZENNY HUB • RIDE A PET  (ENGLISH ONLY • SARAP UI v4.3)
 -- AUTO STEAL + FLY/TELEPORT MODE
--- EGG FILTER + EGG ESP + SAVE POINT
+-- EGG FILTER (DROPDOWN) + EGG ESP + SAVE POINT
 -- MOBILE SUPPORTED • NO KEY
 --============================================================
 
@@ -55,7 +55,7 @@ local Config = {
 }
 
 --============================================================
--- 5. EGG CATALOG (grouped by rarity — highest first)
+-- 5. EGG CATALOG (highest → lowest)
 --============================================================
 
 local EggCatalog = {
@@ -66,6 +66,7 @@ local EggCatalog = {
         "Blackhole Egg",
     },
     Divine = {
+        "Bloom Egg",
         "Galaxy Egg",
         "Aurora Egg",
     },
@@ -102,7 +103,6 @@ local EggCatalog = {
     },
 }
 
--- Explicit order: highest → lowest. Used for UI rendering.
 local RarityRenderOrder = {
     "Ethereal",
     "Divine",
@@ -190,7 +190,7 @@ local function GetEggInfo(Egg)
 end
 
 --============================================================
--- 9. FIND BEST EGG (respects EggFilter)
+-- 9. FIND BEST EGG
 --============================================================
 
 local function FindBestEgg()
@@ -289,7 +289,7 @@ local function FlyTo(Position)
     local Distance = (Root.Position - Position).Magnitude
     if Distance <= 3 then return true end
 
-    local Speed = math.clamp(tonumber(Config.Speed) or 300, 40, 350)
+    local Speed = math.clamp(tonumber(Config.Speed) or 300, 40, 600)
     local Duration = math.max(0.1, Distance / Speed)
 
     local OldCollision = {}
@@ -431,15 +431,20 @@ local function PickupEgg(Egg)
 end
 
 --============================================================
--- 16. FLY BACK
+-- 16. RETURN (respects mode)
 --============================================================
 
-local function FlyBack()
+local function ReturnHome()
     local Target = GetReturnPosition()
     if not Target then
         return false
     end
-    return FlyTo(Target)
+
+    if Config.StealMode == "Teleport" then
+        return TeleportTo(Target)
+    else
+        return FlyTo(Target)
+    end
 end
 
 --============================================================
@@ -482,7 +487,7 @@ local function AutoStealLoop()
             end
 
             if Picked then
-                FlyBack()
+                ReturnHome()
             else
                 task.wait(0.3)
             end
@@ -621,7 +626,7 @@ MainTab:newToggle(
 
 MainTab:newButton(
     "⚡ TELEPORT MODE",
-    "Teleport → Egg → Fly Back",
+    "Teleport → Egg → Teleport Back",
     function()
         Config.StealMode = "Teleport"
     end
@@ -646,31 +651,44 @@ MainTab:newButton(
 )
 
 --============================================================
--- 21. EGG FILTER TAB (highest rarity first)
+-- 21. EGG FILTER TAB (dropdown-based)
 --============================================================
 
 EggFilterTab:newToggle(
     "🎯 USE EGG FILTER",
-    "When ON, Auto Steal only targets eggs you enabled below.",
+    "When ON, Auto Steal only targets eggs you enabled in the list.",
     false,
     function(State)
         Config.UseFilter = State
     end
 )
 
-local FilterToggles = {}
+-- Build the full egg name list (highest → lowest)
+local AllEggNames = {}
+for _, rarity in ipairs(RarityRenderOrder) do
+    local list = EggCatalog[rarity]
+    if list then
+        for _, name in ipairs(list) do
+            table.insert(AllEggNames, name)
+        end
+    end
+end
+
+EggFilterTab:newDropdown(
+    "🥚 SELECT EGGS TO STEAL",
+    "Pick eggs one at a time. Each pick is added to the filter.",
+    AllEggNames,
+    function(Choice)
+        Config.EggFilter[Choice] = true
+    end
+)
 
 EggFilterTab:newButton(
     "✅ SELECT ALL EGGS",
     "Turn on every egg in the filter list.",
     function()
-        for _, rarity in ipairs(RarityRenderOrder) do
-            for _, name in ipairs(EggCatalog[rarity]) do
-                Config.EggFilter[name] = true
-            end
-        end
-        for _, setter in pairs(FilterToggles) do
-            if setter then setter(true) end
+        for _, name in ipairs(AllEggNames) do
+            Config.EggFilter[name] = true
         end
     end
 )
@@ -680,38 +698,24 @@ EggFilterTab:newButton(
     "Turn off every egg in the filter list.",
     function()
         Config.EggFilter = {}
-        for _, setter in pairs(FilterToggles) do
-            if setter then setter(false) end
-        end
     end
 )
 
--- Render rarity sections from highest → lowest
-for _, rarity in ipairs(RarityRenderOrder) do
-    local eggList = EggCatalog[rarity]
-    if eggList then
-        EggFilterTab:newButton(
-            "─── " .. rarity .. " ───",
-            "",
-            function() end
-        )
+EggFilterTab:newButton(
+    "🗑️ REMOVE ONE EGG",
+    "Clears the selected egg from the filter.",
+    function() end
+)
 
-        for _, eggName in ipairs(eggList) do
-            local capturedName = eggName
-
-            local _, setter = EggFilterTab:newToggle(
-                "  " .. eggName,
-                "",
-                false,
-                function(State)
-                    Config.EggFilter[capturedName] = State or nil
-                end
-            )
-
-            FilterToggles[capturedName] = setter
-        end
+-- Second dropdown acts as "remove one"
+EggFilterTab:newDropdown(
+    "🗑️ REMOVE AN EGG FROM FILTER",
+    "Pick an egg to remove from the active filter.",
+    AllEggNames,
+    function(Choice)
+        Config.EggFilter[Choice] = nil
     end
-end
+)
 
 --============================================================
 -- 22. POINT TAB
@@ -737,6 +741,17 @@ PointTab:newButton(
         task.spawn(function()
             FlyTo(Config.SavedPoint.Position)
         end)
+    end
+)
+
+PointTab:newButton(
+    "⚡ TELEPORT TO POINT",
+    "Instantly teleport to your saved point.",
+    function()
+        if not Config.SavedPoint then
+            return
+        end
+        TeleportTo(Config.SavedPoint.Position)
     end
 )
 
@@ -780,11 +795,11 @@ ESPTab:newButton(
 
 SettingsTab:newSlider(
     "⚡ FLY SPEED",
-    "Speed used while flying to eggs (40 – 350).",
+    "Speed used while flying to eggs (40 – 600).",
     300,
-    350,
+    600,
     function(Value)
-        Config.Speed = math.clamp(tonumber(Value) or 300, 40, 350)
+        Config.Speed = math.clamp(tonumber(Value) or 300, 40, 600)
     end
 )
 
