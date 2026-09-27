@@ -21,7 +21,6 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 --============================================================
 
 if game.PlaceId ~= 124216119978534 then
-    warn("[ZENNY HUB] Wrong game!")
     return
 end
 
@@ -36,7 +35,6 @@ local Success, VBHUB = pcall(function()
 end)
 
 if not Success or not VBHUB then
-    warn("[ZENNY HUB] Failed to load Sarap UI.")
     return
 end
 
@@ -373,7 +371,6 @@ end
 local function FlyBack()
     local Target = GetReturnPosition()
     if not Target then
-        warn("[MINH KHA HUB] No Point/Base found.")
         return false
     end
     return FlyTo(Target)
@@ -455,7 +452,7 @@ local function CreateESP(Egg)
     local Part = ESPObjects[Egg]
     if not Part then
         Part = Instance.new("Part")
-        Part.Name         = "MINH_KHA_EGG_ESP"
+        Part.Name         = "ZENNY_EGG_ESP"
         Part.Size         = Vector3.new(0.1, 0.1, 0.1)
         Part.Transparency = 1
         Part.Anchored     = true
@@ -560,7 +557,6 @@ MainTab:newButton(
     "Teleport → Egg → Fly Back",
     function()
         Config.StealMode = "Teleport"
-        print("[MINH KHA HUB] Mode: Teleport")
     end
 )
 
@@ -569,7 +565,6 @@ MainTab:newButton(
     "Fly → Egg → Fly Back",
     function()
         Config.StealMode = "Fly"
-        print("[MINH KHA HUB] Mode: Fly")
     end
 )
 
@@ -577,7 +572,7 @@ MainTab:newButton(
     "📌 CURRENT MODE",
     "Print the current steal mode to console.",
     function()
-        print("[MINH KHA HUB] Current mode:", Config.StealMode)
+        -- intentionally blank (prints removed)
     end
 )
 
@@ -596,7 +591,6 @@ MainTab:newButton(
     "Target eggs with the highest Luck value.",
     function()
         Config.Priority = "Highest Luck"
-        print("[MINH KHA HUB] Priority: Highest Luck")
     end
 )
 
@@ -605,7 +599,6 @@ MainTab:newButton(
     "Target eggs with the rarest tier.",
     function()
         Config.Priority = "Rarest"
-        print("[MINH KHA HUB] Priority: Rarest")
     end
 )
 
@@ -620,7 +613,6 @@ PointTab:newButton(
         local _, _, Root = GetCharacter()
         if not Root then return end
         Config.SavedPoint = Root.CFrame
-        print("[MINH KHA HUB] Point saved.")
     end
 )
 
@@ -629,7 +621,6 @@ PointTab:newButton(
     "Fly back to your saved point.",
     function()
         if not Config.SavedPoint then
-            warn("[MINH KHA HUB] No saved point.")
             return
         end
         task.spawn(function()
@@ -643,7 +634,6 @@ PointTab:newButton(
     "Delete the saved point.",
     function()
         Config.SavedPoint = nil
-        print("[MINH KHA HUB] Point cleared.")
     end
 )
 
@@ -684,7 +674,6 @@ SettingsTab:newSlider(
     350,
     function(Value)
         Config.Speed = math.clamp(tonumber(Value) or 300, 40, 350)
-        print("[MINH KHA HUB] Fly Speed:", Config.Speed)
     end
 )
 
@@ -731,16 +720,3 @@ Player.CharacterAdded:Connect(function()
         AutoStealLoop()
     end
 end)
-
---============================================================
--- DONE
---============================================================
-
-print("==========================================")
-print(" ZENNY HUB • RIDE A PET")
-print(" SARAP UI v4.0 • ENGLISH ONLY")
-print(" AUTO STEAL READY")
-print(" TELEPORT → EGG → FLY BACK")
-print(" FLY → EGG → FLY BACK")
-print(" DEFAULT SPEED: 300")
-print("==========================================")
